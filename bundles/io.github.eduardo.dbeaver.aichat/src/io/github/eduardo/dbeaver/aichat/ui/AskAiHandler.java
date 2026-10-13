@@ -7,7 +7,7 @@ import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.PartInitException;
 import org.eclipse.ui.handlers.HandlerUtil;
 
-/** Opens the AI Chat view using the active SQL editor's connection and selection as context. */
+/** Opens the Kastor view using the active SQL editor's connection and selection as context. */
 public class AskAiHandler extends AbstractHandler {
 
     @Override
@@ -18,7 +18,7 @@ public class AskAiHandler extends AbstractHandler {
             ChatView view = (ChatView) window.getActivePage().showView(ChatView.ID);
             view.focusWithEditorContext();
         } catch (PartInitException e) {
-            throw new ExecutionException("Não foi possível abrir o AI Chat", e);
+            throw new ExecutionException("Não foi possível abrir o Kastor", e);
         }
         return null;
     }

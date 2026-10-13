@@ -7,7 +7,7 @@ import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.PartInitException;
 import org.eclipse.ui.handlers.HandlerUtil;
 
-/** Toolbar/menu action: opens (or focuses) the AI Chat panel. */
+/** Toolbar/menu action: opens (or focuses) the Kastor panel. */
 public class OpenChatHandler extends AbstractHandler {
 
     @Override
@@ -17,7 +17,7 @@ public class OpenChatHandler extends AbstractHandler {
             ChatPlacement.dockRightIfNew(window);
             window.getActivePage().showView(ChatView.ID);
         } catch (PartInitException e) {
-            throw new ExecutionException("Não foi possível abrir o AI Chat", e);
+            throw new ExecutionException("Não foi possível abrir o Kastor", e);
         }
         return null;
     }

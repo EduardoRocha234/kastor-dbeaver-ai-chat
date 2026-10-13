@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generates the AI Chat icons (16x16 and 32x32 PNG, speech bubble) with the standard library only."""
+"""Generates the Kastor icons (16x16 and 32x32 PNG, speech bubble) with the standard library only."""
 import struct
 import sys
 import zlib

@@ -6,7 +6,81 @@
 <style>/*CSS*/</style>
 </head>
 <body>
-<div id="messages"></div>
+<header id="header">
+  <div class="bar">
+    <button type="button" id="menu-btn" class="icon" title="Conversas" aria-label="Conversas">
+      <svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <div id="title" class="title">Nova conversa</div>
+    <button type="button" id="new-btn" class="icon" title="Nova conversa" aria-label="Nova conversa">
+      <svg viewBox="0 0 24 24" width="17" height="17"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <button type="button" id="settings-btn" class="icon" title="Configurações" aria-label="Configurações">
+      <svg viewBox="0 0 24 24" width="17" height="17"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="scroll">
+  <section id="welcome">
+    <div class="logo">K</div>
+    <h1>Kastor - DBeaver AI Chat</h1>
+    <p>Pergunte sobre suas conexões, schemas e dados.<br>Use <kbd>@</kbd> para referenciar schemas e tabelas.</p>
+    <div class="chips">
+      <button type="button" class="chip">Quais conexões estão disponíveis?</button>
+      <button type="button" class="chip">Descreva a estrutura da tabela @</button>
+      <button type="button" class="chip">Monte uma consulta que mostre </button>
+    </div>
+  </section>
+  <div id="messages"></div>
+</main>
+
+<footer id="composer">
+  <div id="mention-menu" role="listbox" hidden></div>
+  <div id="pick-menu" class="pick-menu" role="listbox" hidden></div>
+  <div class="box">
+    <textarea id="input" rows="1" placeholder="Pergunte algo… use @ para referenciar schemas e tabelas"></textarea>
+    <div class="tools">
+      <button type="button" class="pill" id="connection" aria-haspopup="listbox">
+        <svg viewBox="0 0 24 24" width="13" height="13"><ellipse cx="12" cy="5" rx="8" ry="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        <span class="pill-label"></span><svg class="chev" viewBox="0 0 24 24" width="11" height="11"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button type="button" class="pill" id="provider" aria-haspopup="listbox">
+        <svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z" fill="currentColor"/></svg>
+        <span class="pill-label"></span><svg class="chev" viewBox="0 0 24 24" width="11" height="11"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <span class="spacer"></span>
+      <label class="toggle" id="context-label">
+        <input type="checkbox" id="context-toggle">
+        <span class="track"><span class="knob"></span></span>
+        <span>Contexto</span>
+      </label>
+      <button type="button" id="send" class="round" title="Enviar (Enter) · Shift+Enter quebra a linha" aria-label="Enviar" disabled>
+        <svg viewBox="0 0 24 24" width="15" height="15"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button type="button" id="stop" class="round" title="Parar" aria-label="Parar" hidden>
+        <svg viewBox="0 0 24 24" width="13" height="13"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>
+      </button>
+    </div>
+  </div>
+</footer>
+
+<div id="overlay" hidden></div>
+<aside id="sidebar" aria-label="Conversas">
+  <div class="side-head">
+    <span>Conversas</span>
+    <button type="button" id="close-side" class="icon" title="Fechar" aria-label="Fechar">
+      <svg viewBox="0 0 24 24" width="16" height="16"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <button type="button" id="side-new" class="new-chat">
+    <svg viewBox="0 0 24 24" width="15" height="15"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+    Nova conversa
+  </button>
+  <input type="search" id="side-search" placeholder="Buscar conversas…">
+  <div id="conversations"></div>
+  <div id="version" class="version"></div>
+</aside>
 <script>/*JS*/</script>
 </body>
 </html>

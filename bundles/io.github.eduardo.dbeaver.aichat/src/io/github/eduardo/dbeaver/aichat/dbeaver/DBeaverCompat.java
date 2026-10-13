@@ -69,7 +69,7 @@ public final class DBeaverCompat {
         try {
             context.close();
         } catch (Exception | LinkageError e) {
-            log.debug("Error closing AI Chat context", e);
+            log.debug("Error closing Kastor context", e);
         }
     }
 
@@ -125,7 +125,7 @@ public final class DBeaverCompat {
     public static boolean openInNewEditor(IWorkbenchWindow window, DBPDataSourceContainer container, String sql) {
         try {
             SQLNavigatorContext context = container == null ? new SQLNavigatorContext() : new SQLNavigatorContext(container);
-            return SQLEditorHandlerOpenEditor.openSQLConsole(window, context, "AI Chat", sql) != null;
+            return SQLEditorHandlerOpenEditor.openSQLConsole(window, context, "Kastor", sql) != null;
         } catch (RuntimeException | LinkageError e) {
             log.debug("Could not open SQL console", e);
             return false;

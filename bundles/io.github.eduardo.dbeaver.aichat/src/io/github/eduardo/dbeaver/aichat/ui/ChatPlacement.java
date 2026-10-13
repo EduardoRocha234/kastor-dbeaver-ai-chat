@@ -50,7 +50,7 @@ final class ChatPlacement {
             models.insert(stack, editorArea.get(0), EModelService.RIGHT_OF, WIDTH_RATIO);
         } catch (RuntimeException | LinkageError e) {
             // showView still opens the chat, just wherever the workbench puts new views.
-            log.warn("AI Chat: não foi possível acoplar o painel à direita", e);
+            log.warn("Kastor: não foi possível acoplar o painel à direita", e);
         }
     }
 }

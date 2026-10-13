@@ -1,6 +1,6 @@
 Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
-Bundle-Name: DBeaver AI Chat
+Bundle-Name: Kastor - DBeaver AI Chat
 Bundle-SymbolicName: io.github.eduardo.dbeaver.aichat;singleton:=true
 Bundle-Version: 0.1.0.qualifier
 Bundle-Vendor: Eduardo

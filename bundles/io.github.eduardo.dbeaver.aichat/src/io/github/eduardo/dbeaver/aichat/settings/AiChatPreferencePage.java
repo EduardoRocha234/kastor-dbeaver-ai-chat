@@ -221,10 +221,10 @@ public class AiChatPreferencePage extends PreferencePage implements IWorkbenchPr
                 }
             });
             String text = reply[0] == null ? "" : reply[0];
-            MessageDialog.openInformation(getShell(), "AI Chat",
+            MessageDialog.openInformation(getShell(), "Kastor",
                     "Conexão OK. Resposta: " + (text.length() > 200 ? text.substring(0, 200) + "…" : text));
         } catch (InvocationTargetException e) {
-            MessageDialog.openError(getShell(), "AI Chat", "Falha: " + e.getCause().getMessage());
+            MessageDialog.openError(getShell(), "Kastor", "Falha: " + e.getCause().getMessage());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -255,7 +255,7 @@ public class AiChatPreferencePage extends PreferencePage implements IWorkbenchPr
             removedIds.clear();
             return true;
         } catch (Exception e) {
-            MessageDialog.openError(getShell(), "AI Chat", "Não foi possível salvar: " + e.getMessage());
+            MessageDialog.openError(getShell(), "Kastor", "Não foi possível salvar: " + e.getMessage());
             return false;
         }
     }

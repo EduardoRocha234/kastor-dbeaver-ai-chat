@@ -43,7 +43,7 @@ public final class ProviderSettings {
             }.getType());
             return list == null ? new ArrayList<>() : new ArrayList<>(list);
         } catch (RuntimeException e) {
-            log.error("Invalid AI Chat provider settings", e);
+            log.error("Invalid Kastor provider settings", e);
             return new ArrayList<>();
         }
     }

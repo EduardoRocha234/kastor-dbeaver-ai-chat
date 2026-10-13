@@ -1,5 +1,7 @@
 package io.github.eduardo.dbeaver.aichat.ui;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import io.github.eduardo.dbeaver.aichat.Activator;
 import io.github.eduardo.dbeaver.aichat.core.CancellationToken;
 import io.github.eduardo.dbeaver.aichat.core.agent.ChatSession;
@@ -14,6 +16,8 @@ import io.github.eduardo.dbeaver.aichat.core.llm.ChatMessage;
 import io.github.eduardo.dbeaver.aichat.core.llm.ProviderConfig;
 import io.github.eduardo.dbeaver.aichat.core.llm.ProviderFactory;
 import io.github.eduardo.dbeaver.aichat.core.llm.ToolCall;
+import io.github.eduardo.dbeaver.aichat.core.mention.Mention;
+import io.github.eduardo.dbeaver.aichat.core.mention.Mentions;
 import io.github.eduardo.dbeaver.aichat.core.tools.ConnectionInfo;
 import io.github.eduardo.dbeaver.aichat.core.tools.Decision;
 import io.github.eduardo.dbeaver.aichat.core.tools.ToolContext;
@@ -27,40 +31,27 @@ import io.github.eduardo.dbeaver.aichat.settings.AiChatPreferencePage;
 import io.github.eduardo.dbeaver.aichat.settings.ProviderSettings;
 import java.io.IOException;
 import java.net.http.HttpClient;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.jobs.Job;
-import org.eclipse.jface.action.Action;
-import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.jface.dialogs.MessageDialog;
-import org.eclipse.jface.viewers.LabelProvider;
-import org.eclipse.jface.window.Window;
-import org.eclipse.swt.SWT;
 import org.eclipse.swt.dnd.Clipboard;
 import org.eclipse.swt.dnd.TextTransfer;
 import org.eclipse.swt.dnd.Transfer;
-import org.eclipse.swt.layout.GridData;
-import org.eclipse.swt.layout.GridLayout;
-import org.eclipse.swt.widgets.Button;
-import org.eclipse.swt.widgets.Combo;
+import org.eclipse.swt.graphics.RGB;
+import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
-import org.eclipse.swt.widgets.Label;
-import org.eclipse.swt.widgets.Text;
-import org.eclipse.ui.ISharedImages;
 import org.eclipse.ui.IWorkbenchWindow;
-import org.eclipse.ui.PlatformUI;
-import org.eclipse.ui.dialogs.ElementListSelectionDialog;
 import org.eclipse.ui.dialogs.PreferencesUtil;
 import org.eclipse.ui.part.ViewPart;
 import org.jkiss.dbeaver.Log;
 import org.jkiss.dbeaver.model.DBPDataSourceContainer;
+import org.osgi.framework.Version;
 
 public class ChatView extends ViewPart {
 
@@ -69,8 +60,6 @@ public class ChatView extends ViewPart {
     private static final Log log = Log.getLog(ChatView.class);
     private static final String EDITOR_CONNECTION = "(conexão do editor ativo)";
     private static final int MAX_TOOL_RESULT_CHARS = 4000;
-    private static final DateTimeFormatter DATE_FORMAT =
-            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneId.systemDefault());
 
     private final DBeaverGateway gateway = new DBeaverGateway();
     private final ToolRegistry tools = ToolRegistry.standard(gateway);
@@ -82,38 +71,35 @@ public class ChatView extends ViewPart {
     private List<ProviderConfig> providers = List.of();
     private List<ConnectionInfo> connections = List.of();
     private CancellationToken running;
+    /** Connection picked in the header; null = the active editor's connection. */
+    private String pickedConnectionId;
+    private boolean includeContext = true;
 
     private Display display;
-    private Combo providerCombo;
-    private Combo connectionCombo;
-    private Button includeContextCheck;
-    private Label contextLabel;
     private ChatBrowserBridge bridge;
     private UiApprovalGate approvalGate;
-    private Text input;
-    private Button sendButton;
-    private Button stopButton;
+    private MentionAssist mentions;
 
     @Override
     public void createPartControl(Composite parent) {
         display = parent.getDisplay();
         store = new ConversationStore(Activator.getDefault().conversationsDir());
-        parent.setLayout(new GridLayout(1, false));
-        createTopBar(parent);
-        createContextBar(parent);
+        parent.setLayout(new FillLayout());
         bridge = new ChatBrowserBridge(parent, new Callbacks());
-        bridge.control().setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
         approvalGate = new UiApprovalGate(display, bridge);
-        createInputArea(parent);
-        createActions();
+        bridge.setTheme(isDark(parent));
+        bridge.setVersion(versionLabel());
+        mentions = new MentionAssist(display, gateway,
+                () -> selectedConnectionId(EditorContextResolver.fromActiveEditor(window())), bridge::showMentions);
         refreshProviders();
         refreshConnections();
         refreshEditorContext();
+        showConversationInfo();
     }
 
     @Override
     public void setFocus() {
-        input.setFocus();
+        bridge.focusInput();
         refreshProviders();
         refreshConnections();
         refreshEditorContext();
@@ -131,100 +117,47 @@ public class ChatView extends ViewPart {
         super.dispose();
     }
 
-    /** Called by "Perguntar à IA": use the active editor's connection and selection. */
-    public void focusWithEditorContext() {
-        includeContextCheck.setSelection(true);
-        connectionCombo.select(0);
+    /** Called by "Referenciar no Kastor": selects the objects' connection and adds "@path" mentions to the input. */
+    public void reference(String connectionId, List<ReferenceInKastorHandler.Reference> references) {
+        selectConnection(connectionId);
         refreshEditorContext();
-        if (input.getText().isBlank()) {
-            input.setText("Explique o SQL selecionado.");
+        List<String> paths = new ArrayList<>();
+        for (ReferenceInKastorHandler.Reference r : references) {
+            paths.add(r.path());
+            if (r.schemaPath() != null) {
+                mentions.rememberSchema(connectionId, r.schemaPath());
+            }
         }
-        input.setFocus();
-        input.selectAll();
+        bridge.insertMentions(paths);
+        bridge.focusInput();
     }
 
-    private void createTopBar(Composite parent) {
-        Composite bar = new Composite(parent, SWT.NONE);
-        bar.setLayout(new GridLayout(4, false));
-        bar.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
-        new Label(bar, SWT.NONE).setText("Modelo:");
-        providerCombo = new Combo(bar, SWT.DROP_DOWN | SWT.READ_ONLY);
-        providerCombo.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
-        providerCombo.addListener(SWT.Selection, e -> {
-            int i = providerCombo.getSelectionIndex();
-            if (i >= 0 && i < providers.size()) {
-                ProviderSettings.setActiveProviderId(providers.get(i).id());
-            }
-        });
-        new Label(bar, SWT.NONE).setText("Conexão:");
-        connectionCombo = new Combo(bar, SWT.DROP_DOWN | SWT.READ_ONLY);
-        connectionCombo.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
-        connectionCombo.addListener(SWT.Selection, e -> refreshEditorContext());
+    /** Called by "Perguntar ao Kastor": use the active editor's connection and selection. */
+    public void focusWithEditorContext() {
+        includeContext = true;
+        pickedConnectionId = null;
+        refreshConnections();
+        refreshEditorContext();
+        bridge.setInput("Explique o SQL selecionado.", true);
+        bridge.focusInput();
     }
 
-    private void createContextBar(Composite parent) {
-        Composite bar = new Composite(parent, SWT.NONE);
-        bar.setLayout(new GridLayout(2, false));
-        bar.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
-        includeContextCheck = new Button(bar, SWT.CHECK);
-        includeContextCheck.setText("Usar contexto do editor:");
-        includeContextCheck.setSelection(true);
-        contextLabel = new Label(bar, SWT.NONE);
-        contextLabel.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+    /** "Kastor 0.1.0 · build 13/10/2026 20:57" from the bundle version (qualifier = build timestamp, UTC). */
+    private static String versionLabel() {
+        Version v = Activator.getDefault().getBundle().getVersion();
+        String label = "Kastor " + v.getMajor() + "." + v.getMinor() + "." + v.getMicro();
+        String q = v.getQualifier();
+        if (q != null && q.matches("\\d{12}")) {
+            return label + " · build " + q.substring(6, 8) + "/" + q.substring(4, 6) + "/" + q.substring(0, 4) + " "
+                    + q.substring(8, 10) + ":" + q.substring(10, 12) + " UTC";
+        }
+        return q == null || q.isEmpty() ? label : label + " · " + q;
     }
 
-    private void createInputArea(Composite parent) {
-        Composite area = new Composite(parent, SWT.NONE);
-        area.setLayout(new GridLayout(2, false));
-        area.setLayoutData(new GridData(SWT.FILL, SWT.BOTTOM, true, false));
-        input = new Text(area, SWT.MULTI | SWT.WRAP | SWT.V_SCROLL | SWT.BORDER);
-        GridData inputData = new GridData(SWT.FILL, SWT.FILL, true, false);
-        inputData.heightHint = input.getLineHeight() * 4;
-        input.setLayoutData(inputData);
-        input.setToolTipText("Ctrl+Enter envia");
-        input.addListener(SWT.KeyDown, e -> {
-            if ((e.stateMask & SWT.MOD1) != 0 && (e.keyCode == SWT.CR || e.keyCode == SWT.KEYPAD_CR)) {
-                e.doit = false;
-                send();
-            }
-        });
-        Composite buttons = new Composite(area, SWT.NONE);
-        buttons.setLayout(new GridLayout(1, true));
-        buttons.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, false));
-        sendButton = new Button(buttons, SWT.PUSH);
-        sendButton.setText("Enviar");
-        sendButton.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
-        sendButton.addListener(SWT.Selection, e -> send());
-        stopButton = new Button(buttons, SWT.PUSH);
-        stopButton.setText("Parar");
-        stopButton.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
-        stopButton.setEnabled(false);
-        stopButton.addListener(SWT.Selection, e -> {
-            if (running != null) {
-                running.cancel();
-            }
-        });
-    }
-
-    private void createActions() {
-        IToolBarManager toolbar = getViewSite().getActionBars().getToolBarManager();
-        ISharedImages images = PlatformUI.getWorkbench().getSharedImages();
-        toolbar.add(action("Nova conversa", images, ISharedImages.IMG_TOOL_NEW_WIZARD, this::newConversation));
-        toolbar.add(action("Histórico de conversas", images, ISharedImages.IMG_OBJ_FOLDER, this::openHistory));
-        toolbar.add(action("Apagar conversa atual", images, ISharedImages.IMG_TOOL_DELETE, this::deleteConversation));
-        toolbar.add(action("Configurações do AI Chat", images, ISharedImages.IMG_DEF_VIEW, this::openPreferences));
-    }
-
-    private static Action action(String text, ISharedImages images, String image, Runnable run) {
-        Action action = new Action(text) {
-            @Override
-            public void run() {
-                run.run();
-            }
-        };
-        action.setToolTipText(text);
-        action.setImageDescriptor(images.getImageDescriptor(image));
-        return action;
+    /** The page can't see DBeaver's theme (WebView2 follows Windows), so derive it from the SWT background. */
+    private static boolean isDark(Composite parent) {
+        RGB bg = parent.getBackground().getRGB();
+        return 0.299 * bg.red + 0.587 * bg.green + 0.114 * bg.blue < 128;
     }
 
     private IWorkbenchWindow window() {
@@ -233,69 +166,49 @@ public class ChatView extends ViewPart {
 
     private void refreshProviders() {
         providers = ProviderSettings.loadProviders();
-        String active = ProviderSettings.activeProviderId();
-        providerCombo.removeAll();
+        JsonArray entries = new JsonArray();
         if (providers.isEmpty()) {
-            providerCombo.add("(configure um provedor)");
-            providerCombo.select(0);
-            return;
+            entries.add(entry("", "(configure um provedor)"));
         }
-        int selection = 0;
-        for (int i = 0; i < providers.size(); i++) {
-            ProviderConfig p = providers.get(i);
-            providerCombo.add(p.name() + " — " + p.model());
-            if (p.id().equals(active)) {
-                selection = i;
-            }
+        for (ProviderConfig p : providers) {
+            entries.add(entry(p.id(), p.name() + " — " + p.model()));
         }
-        providerCombo.select(selection);
+        ProviderConfig selected = selectedProvider();
+        bridge.setProviders(entries, selected == null ? "" : selected.id());
     }
 
     private ProviderConfig selectedProvider() {
-        int i = providerCombo.getSelectionIndex();
-        return i >= 0 && i < providers.size() ? providers.get(i) : null;
+        String active = ProviderSettings.activeProviderId();
+        return providers.stream().filter(p -> p.id().equals(active)).findFirst()
+                .orElse(providers.isEmpty() ? null : providers.get(0));
     }
 
     private void refreshConnections() {
-        int index = connectionCombo.getSelectionIndex();
-        String selectedId = index > 0 && index - 1 < connections.size() ? connections.get(index - 1).id() : null;
         connections = gateway.listConnections();
-        connectionCombo.removeAll();
-        connectionCombo.add(EDITOR_CONNECTION);
-        int selection = 0;
-        for (int i = 0; i < connections.size(); i++) {
-            ConnectionInfo c = connections.get(i);
-            connectionCombo.add(c.name() + "  [" + c.project() + "]");
-            if (c.id().equals(selectedId)) {
-                selection = i + 1;
-            }
+        if (pickedConnectionId != null && connections.stream().noneMatch(c -> c.id().equals(pickedConnectionId))) {
+            pickedConnectionId = null;
         }
-        connectionCombo.select(selection);
+        JsonArray entries = new JsonArray();
+        entries.add(entry("", EDITOR_CONNECTION));
+        for (ConnectionInfo c : connections) {
+            entries.add(entry(c.id(), c.name() + "  [" + c.project() + "]"));
+        }
+        bridge.setConnections(entries, pickedConnectionId == null ? "" : pickedConnectionId);
     }
 
     private void selectConnection(String connectionId) {
+        pickedConnectionId = connectionId;
         refreshConnections();
-        for (int i = 0; i < connections.size(); i++) {
-            if (connections.get(i).id().equals(connectionId)) {
-                connectionCombo.select(i + 1);
-                return;
-            }
-        }
-        connectionCombo.select(0);
     }
 
     private String selectedConnectionId(EditorContext active) {
-        int index = connectionCombo.getSelectionIndex();
-        if (index > 0 && index - 1 < connections.size()) {
-            return connections.get(index - 1).id();
+        if (pickedConnectionId != null) {
+            return pickedConnectionId;
         }
         return active != null && active.container() != null ? active.container().getId() : null;
     }
 
     private void refreshEditorContext() {
-        if (contextLabel == null || contextLabel.isDisposed()) {
-            return;
-        }
         EditorContext ctx = EditorContextResolver.fromActiveEditor(window());
         String text;
         if (ctx == null) {
@@ -310,21 +223,31 @@ public class ChatView extends ViewPart {
             }
             text = sb.toString();
         }
-        contextLabel.setText(text);
-        contextLabel.getParent().layout();
+        bridge.setEditorContext(text, includeContext);
     }
 
-    private void send() {
+    private void showConversationInfo() {
+        bridge.setTitle(conversation.title());
+    }
+
+    private static JsonObject entry(String id, String label) {
+        JsonObject o = new JsonObject();
+        o.addProperty("id", id);
+        o.addProperty("label", label);
+        return o;
+    }
+
+    private void send(String typed) {
         if (running != null) {
             return;
         }
-        String text = input.getText().trim();
+        String text = typed.trim();
         if (text.isEmpty()) {
             return;
         }
         ProviderConfig config = selectedProvider();
         if (config == null) {
-            MessageDialog.openInformation(getSite().getShell(), "AI Chat", "Configure um provedor de IA primeiro.");
+            MessageDialog.openInformation(getSite().getShell(), "Kastor", "Configure um provedor de IA primeiro.");
             openPreferences();
             return;
         }
@@ -332,19 +255,19 @@ public class ChatView extends ViewPart {
         EditorContext active = EditorContextResolver.fromActiveEditor(window());
         String connectionId = selectedConnectionId(active);
         ConnectionInfo connection = connections.stream().filter(c -> c.id().equals(connectionId)).findFirst().orElse(null);
-        boolean useEditor = includeContextCheck.getSelection() && active != null && active.container() != null
+        boolean useEditor = includeContext && active != null && active.container() != null
                 && active.container().getId().equals(connectionId);
-        String systemPrompt = SystemPromptBuilder.build(new PromptContext(connection,
-                connectionId == null ? null : gateway.dialectName(connectionId),
-                useEditor ? active.schema() : null,
-                useEditor ? active.selectedText() : null,
-                ProviderSettings.toolLimits().maxRows()));
+        String dialect = connectionId == null ? null : gateway.dialectName(connectionId);
+        String editorSchema = useEditor ? active.schema() : null;
+        String editorSql = useEditor ? active.selectedText() : null;
+        int maxRows = ProviderSettings.toolLimits().maxRows();
+        List<String> knownSchemas = mentions.cachedSchemas(connectionId);
 
         Conversation current = conversation;
         current.setProviderId(config.id());
         current.setConnectionId(connectionId);
         bridge.addUser(text);
-        input.setText("");
+        bridge.clearInput();
 
         CancellationToken token = new CancellationToken();
         setRunning(token);
@@ -352,8 +275,10 @@ public class ChatView extends ViewPart {
                 ProviderFactory.create(config, ProviderSettings.apiKey(config.id()), http),
                 config, tools, ProviderSettings.sessionSettings());
         ToolContext toolContext = new ToolContext(connectionId, approvalGate, token, ProviderSettings.toolLimits());
-        UiListener listener = new UiListener(token);
-        Job job = Job.create("AI Chat", monitor -> {
+        UiListener listener = new UiListener(token, current);
+        Job job = Job.create("Kastor", monitor -> {
+            String systemPrompt = SystemPromptBuilder.build(new PromptContext(connection, dialect, editorSchema,
+                    editorSql, maxRows, referencedObjects(text, knownSchemas)));
             session.runTurn(text, systemPrompt, toolContext, listener);
             save(current);
             return Status.OK_STATUS;
@@ -362,25 +287,30 @@ public class ChatView extends ViewPart {
         job.schedule();
     }
 
+    /**
+     * Resolves @mentions against the schemas browsed with the @ menu. Never loads all schemas here: on PostgreSQL
+     * that connects to every database; unresolved paths go to the model as typed.
+     */
+    private static List<Mention> referencedObjects(String text, List<String> knownSchemas) {
+        return text.contains("@") ? Mentions.parse(text, knownSchemas) : List.of();
+    }
+
     private void setRunning(CancellationToken token) {
         running = token;
-        if (!sendButton.isDisposed()) {
-            sendButton.setEnabled(token == null);
-            stopButton.setEnabled(token != null);
-        }
+        bridge.setRunning(token != null);
     }
 
     private void save(Conversation c) {
         try {
             store.save(c);
         } catch (IOException | RuntimeException e) {
-            log.error("Could not save AI Chat conversation", e);
+            log.error("Could not save Kastor conversation", e);
         }
     }
 
     private boolean busy() {
         if (running != null) {
-            MessageDialog.openInformation(getSite().getShell(), "AI Chat", "Aguarde ou pare a resposta atual.");
+            MessageDialog.openInformation(getSite().getShell(), "Kastor", "Aguarde ou pare a resposta atual.");
             return true;
         }
         return false;
@@ -392,44 +322,39 @@ public class ChatView extends ViewPart {
         }
         conversation = Conversation.create();
         bridge.clear();
+        showConversationInfo();
+        bridge.focusInput();
     }
 
-    private void openHistory() {
-        if (busy()) {
-            return;
-        }
-        List<ConversationSummary> list;
+    private void listConversations() {
+        JsonArray entries = new JsonArray();
         try {
-            list = store.list();
-        } catch (IOException e) {
-            MessageDialog.openError(getSite().getShell(), "AI Chat", "Erro ao ler histórico: " + e.getMessage());
-            return;
-        }
-        ElementListSelectionDialog dialog = new ElementListSelectionDialog(getSite().getShell(), new LabelProvider() {
-            @Override
-            public String getText(Object element) {
-                ConversationSummary s = (ConversationSummary) element;
-                return s.title() + "   (" + DATE_FORMAT.format(Instant.ofEpochMilli(s.updatedAt())) + ")";
+            for (ConversationSummary s : store.list()) {
+                JsonObject o = new JsonObject();
+                o.addProperty("id", s.id());
+                o.addProperty("title", s.title());
+                o.addProperty("updatedAt", s.updatedAt());
+                entries.add(o);
             }
-        });
-        dialog.setTitle("Histórico de conversas");
-        dialog.setMessage("Escolha uma conversa:");
-        dialog.setElements(list.toArray());
-        dialog.setMultipleSelection(false);
-        if (dialog.open() == Window.OK && dialog.getFirstResult() instanceof ConversationSummary) {
-            openConversation(((ConversationSummary) dialog.getFirstResult()).id());
+        } catch (IOException e) {
+            bridge.addError("Erro ao ler histórico: " + e.getMessage());
         }
+        bridge.setConversations(entries, conversation.id());
     }
 
     private void openConversation(String id) {
+        if (busy()) {
+            return;
+        }
         try {
             conversation = store.load(id);
         } catch (IOException | RuntimeException e) {
-            MessageDialog.openError(getSite().getShell(), "AI Chat", "Erro ao abrir conversa: " + e.getMessage());
+            bridge.addError("Erro ao abrir conversa: " + e.getMessage());
             return;
         }
         selectConnection(conversation.connectionId());
         render(conversation);
+        showConversationInfo();
     }
 
     private void render(Conversation c) {
@@ -465,20 +390,22 @@ public class ChatView extends ViewPart {
         }
     }
 
-    private void deleteConversation() {
-        if (busy()) {
-            return;
-        }
-        if (!MessageDialog.openConfirm(getSite().getShell(), "AI Chat", "Apagar a conversa atual do histórico?")) {
+    private void deleteConversation(String id) {
+        boolean current = id.equals(conversation.id());
+        if (current && busy()) {
             return;
         }
         try {
-            store.delete(conversation.id());
+            store.delete(id);
         } catch (IOException e) {
             log.error("Could not delete conversation", e);
         }
-        conversation = Conversation.create();
-        bridge.clear();
+        if (current) {
+            conversation = Conversation.create();
+            bridge.clear();
+            showConversationInfo();
+        }
+        listConversations();
     }
 
     private void openPreferences() {
@@ -535,7 +462,7 @@ public class ChatView extends ViewPart {
                     gateway.findContainer(selectedConnectionId(EditorContextResolver.fromActiveEditor(window())));
             if (!DBeaverCompat.openInNewEditor(window(), container, sql)) {
                 copyToClipboard(sql);
-                MessageDialog.openInformation(getSite().getShell(), "AI Chat",
+                MessageDialog.openInformation(getSite().getShell(), "Kastor",
                         "Não foi possível abrir um editor SQL. O SQL foi copiado para a área de transferência.");
             }
         }
@@ -544,19 +471,83 @@ public class ChatView extends ViewPart {
         public void copy(String text) {
             copyToClipboard(text);
         }
+
+        @Override
+        public void send(String text) {
+            ChatView.this.send(text);
+        }
+
+        @Override
+        public void stop() {
+            if (running != null) {
+                running.cancel();
+            }
+        }
+
+        @Override
+        public void mention(int seq, String query) {
+            mentions.query(seq, query);
+        }
+
+        @Override
+        public void selectProvider(String id) {
+            if (id.isEmpty()) {
+                openPreferences();
+            } else {
+                ProviderSettings.setActiveProviderId(id);
+            }
+        }
+
+        @Override
+        public void selectConnection(String id) {
+            ChatView.this.selectConnection(id.isEmpty() ? null : id);
+            refreshEditorContext();
+        }
+
+        @Override
+        public void toggleContext(boolean include) {
+            includeContext = include;
+        }
+
+        @Override
+        public void newConversation() {
+            ChatView.this.newConversation();
+        }
+
+        @Override
+        public void listConversations() {
+            ChatView.this.listConversations();
+        }
+
+        @Override
+        public void openConversation(String id) {
+            ChatView.this.openConversation(id);
+        }
+
+        @Override
+        public void deleteConversation(String id) {
+            ChatView.this.deleteConversation(id);
+        }
+
+        @Override
+        public void openSettings() {
+            openPreferences();
+        }
     }
 
     /** Receives session events on the worker thread and forwards them to the UI thread. */
     private final class UiListener implements SessionListener {
 
         private final CancellationToken token;
+        private final Conversation owner;
         private final StringBuilder text = new StringBuilder();
         private final Map<String, String> toolDomIds = new HashMap<>();
         private String messageId;
         private boolean flushScheduled;
 
-        UiListener(CancellationToken token) {
+        UiListener(CancellationToken token, Conversation owner) {
             this.token = token;
+            this.owner = owner;
         }
 
         @Override
@@ -566,7 +557,13 @@ public class ChatView extends ViewPart {
                 messageId = id;
                 text.setLength(0);
             }
-            ui(() -> bridge.startAssistant(id));
+            String title = owner.title();
+            ui(() -> {
+                bridge.startAssistant(id);
+                if (owner == conversation) {
+                    bridge.setTitle(title);
+                }
+            });
         }
 
         @Override

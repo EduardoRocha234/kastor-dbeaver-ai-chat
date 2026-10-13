@@ -127,7 +127,7 @@ final class ProviderDialog extends Dialog {
         String url = urlText.getText().trim();
         String model = modelText.getText().trim();
         if (name.isEmpty() || url.isEmpty() || model.isEmpty()) {
-            MessageDialog.openError(getShell(), "AI Chat", "Preencha nome, URL base e modelo.");
+            MessageDialog.openError(getShell(), "Kastor", "Preencha nome, URL base e modelo.");
             return;
         }
         boolean anthropic = typeCombo.getSelectionIndex() == 1;
@@ -137,7 +137,7 @@ final class ProviderDialog extends Dialog {
             try {
                 temperature = Double.parseDouble(t);
             } catch (NumberFormatException e) {
-                MessageDialog.openError(getShell(), "AI Chat", "Temperatura inválida: " + t);
+                MessageDialog.openError(getShell(), "Kastor", "Temperatura inválida: " + t);
                 return;
             }
         }

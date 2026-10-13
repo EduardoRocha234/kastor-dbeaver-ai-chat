@@ -128,6 +128,28 @@ class ToolsTest {
     }
 
     @Test
+    void runQueryPassesSchemaToGateway() {
+        ToolOutcome out = call("run_query", "{\"sql\":\"select 1\",\"schema\":\"base_dev.public\"}", ctx("pg-1", Decision.APPROVED));
+        assertFalse(out.error(), out.content());
+        assertEquals("base_dev.public", gateway.lastSchema);
+    }
+
+    @Test
+    void runQueryWithoutSchemaUsesDefault() {
+        call("run_query", "{\"sql\":\"select 1\"}", ctx("pg-1", Decision.APPROVED));
+        assertNull(gateway.lastSchema);
+    }
+
+    @Test
+    void executeWritePassesSchemaAndShowsItInApproval() {
+        ToolOutcome out = call("execute_write",
+                "{\"sql\":\"delete from t\",\"reason\":\"x\",\"schema\":\"base_dev.public\"}", ctx("pg-1", Decision.APPROVED));
+        assertFalse(out.error(), out.content());
+        assertEquals("base_dev.public", gateway.lastSchema);
+        assertEquals("prod-pg / base_dev.public", approvals.get(0).connectionName());
+    }
+
+    @Test
     void executeWriteRejectedByUser() {
         ToolOutcome out = call("execute_write", "{\"sql\":\"delete from orders\",\"reason\":\"x\"}", ctx("pg-1", Decision.REJECTED));
         assertTrue(out.error());

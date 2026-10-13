@@ -3,5 +3,5 @@
    <feature id="io.github.eduardo.dbeaver.aichat.feature" version="0.0.0">
       <category name="aichat"/>
    </feature>
-   <category-def name="aichat" label="DBeaver AI Chat"/>
+   <category-def name="aichat" label="Kastor - DBeaver AI Chat"/>
 </site>

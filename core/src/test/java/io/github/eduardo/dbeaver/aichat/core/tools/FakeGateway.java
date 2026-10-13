@@ -31,6 +31,7 @@ final class FakeGateway implements DatabaseGateway {
     final List<String> reads = new ArrayList<>();
     final List<String> writes = new ArrayList<>();
     String lastConnectionId;
+    String lastSchema;
     int lastMaxRows;
     int lastLimit;
 
@@ -49,6 +50,11 @@ final class FakeGateway implements DatabaseGateway {
     }
 
     @Override
+    public List<ContainerInfo> listContainers(String connectionId, String parent) {
+        return schemas.stream().map(s -> new ContainerInfo(s, false)).toList();
+    }
+
+    @Override
     public List<TableInfo> listTables(String connectionId, String schema, String nameFilter, int limit) {
         lastConnectionId = connectionId;
         lastLimit = limit;
@@ -62,16 +68,18 @@ final class FakeGateway implements DatabaseGateway {
     }
 
     @Override
-    public QueryResult runReadQuery(String connectionId, String sql, int maxRows, CancellationToken cancel) {
+    public QueryResult runReadQuery(String connectionId, String schema, String sql, int maxRows, CancellationToken cancel) {
         lastConnectionId = connectionId;
+        lastSchema = schema;
         lastMaxRows = maxRows;
         reads.add(sql);
         return queryResult;
     }
 
     @Override
-    public long executeUpdate(String connectionId, String sql, CancellationToken cancel) {
+    public long executeUpdate(String connectionId, String schema, String sql, CancellationToken cancel) {
         lastConnectionId = connectionId;
+        lastSchema = schema;
         writes.add(sql);
         return updateCount;
     }

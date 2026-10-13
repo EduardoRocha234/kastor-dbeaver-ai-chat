@@ -4,7 +4,7 @@
    <extension point="org.eclipse.ui.views">
       <view
             id="io.github.eduardo.dbeaver.aichat.view"
-            name="AI Chat"
+            name="Kastor"
             category="org.jkiss.dbeaver.core.category"
             class="io.github.eduardo.dbeaver.aichat.ui.ChatView"
             icon="icons/chat.png"
@@ -27,23 +27,42 @@
    <extension point="org.eclipse.ui.preferencePages">
       <page
             id="io.github.eduardo.dbeaver.aichat.preferences"
-            name="AI Chat"
+            name="Kastor"
             class="io.github.eduardo.dbeaver.aichat.settings.AiChatPreferencePage"/>
    </extension>
 
    <extension point="org.eclipse.ui.commands">
       <command
             id="io.github.eduardo.dbeaver.aichat.openChat"
-            name="AI Chat"
-            description="Abrir o painel de chat de IA"/>
+            name="Kastor"
+            description="Abrir o painel do Kastor"/>
+      <command
+            id="io.github.eduardo.dbeaver.aichat.referenceObject"
+            name="Referenciar no Kastor"
+            description="Abre o Kastor com @referência aos objetos selecionados"/>
       <command
             id="io.github.eduardo.dbeaver.aichat.askAboutSelection"
-            name="Perguntar à IA sobre a seleção"/>
+            name="Perguntar ao Kastor sobre a seleção"/>
    </extension>
 
    <extension point="org.eclipse.ui.commandImages">
       <image commandId="io.github.eduardo.dbeaver.aichat.openChat" icon="icons/chat.png"/>
       <image commandId="io.github.eduardo.dbeaver.aichat.askAboutSelection" icon="icons/chat.png"/>
+      <image commandId="io.github.eduardo.dbeaver.aichat.referenceObject" icon="icons/chat.png"/>
+   </extension>
+
+   <!-- Ctrl+Alt+K (Cmd+Option+K on macOS) opens or focuses the panel; free in DBeaver's default bindings.
+        Users can change it in Preferences > General > Keys. -->
+   <extension point="org.eclipse.ui.bindings">
+      <key
+            commandId="io.github.eduardo.dbeaver.aichat.openChat"
+            schemeId="org.eclipse.ui.defaultAcceleratorConfiguration"
+            sequence="M1+M3+K"/>
+      <!-- Ctrl+Alt+R: also works from an open table/schema editor, whose tab menu can't be extended. -->
+      <key
+            commandId="io.github.eduardo.dbeaver.aichat.referenceObject"
+            schemeId="org.eclipse.ui.defaultAcceleratorConfiguration"
+            sequence="M1+M3+R"/>
    </extension>
 
    <extension point="org.eclipse.ui.handlers">
@@ -51,22 +70,38 @@
             commandId="io.github.eduardo.dbeaver.aichat.openChat"
             class="io.github.eduardo.dbeaver.aichat.ui.OpenChatHandler"/>
       <handler
+            commandId="io.github.eduardo.dbeaver.aichat.referenceObject"
+            class="io.github.eduardo.dbeaver.aichat.ui.ReferenceInKastorHandler"/>
+      <handler
             commandId="io.github.eduardo.dbeaver.aichat.askAboutSelection"
             class="io.github.eduardo.dbeaver.aichat.ui.AskAiHandler"/>
    </extension>
 
    <extension point="org.eclipse.ui.menus">
+      <!-- Database navigator context menu (connections, databases, schemas, tables...). -->
+      <menuContribution allPopups="false" locationURI="popup:org.eclipse.ui.popup.any?after=navigator_additions">
+         <command commandId="io.github.eduardo.dbeaver.aichat.referenceObject">
+            <visibleWhen checkEnabled="false">
+               <with variable="selection">
+                  <count value="+"/>
+                  <iterate operator="and">
+                     <instanceof value="org.jkiss.dbeaver.model.navigator.DBNDatabaseNode"/>
+                  </iterate>
+               </with>
+            </visibleWhen>
+         </command>
+      </menuContribution>
       <!-- Quick-open button in the main toolbar (standard Eclipse location, stable across DBeaver versions). -->
       <menuContribution locationURI="toolbar:org.eclipse.ui.main.toolbar?after=additions">
-         <toolbar id="io.github.eduardo.dbeaver.aichat.toolbar" label="AI Chat">
+         <toolbar id="io.github.eduardo.dbeaver.aichat.toolbar" label="Kastor">
             <command
                   commandId="io.github.eduardo.dbeaver.aichat.openChat"
-                  tooltip="Abrir o AI Chat"
+                  tooltip="Abrir o Kastor"
                   style="push"/>
          </toolbar>
       </menuContribution>
       <menuContribution locationURI="menu:window?after=additions">
-         <command commandId="io.github.eduardo.dbeaver.aichat.openChat" label="AI Chat"/>
+         <command commandId="io.github.eduardo.dbeaver.aichat.openChat" label="Kastor"/>
       </menuContribution>
       <menuContribution
             locationURI="popup:org.jkiss.dbeaver.ui.editors.sql.SQLEditor.EditorContext?after=sql.extras">

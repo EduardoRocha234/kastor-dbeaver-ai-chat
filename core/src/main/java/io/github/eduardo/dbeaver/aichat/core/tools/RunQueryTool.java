@@ -29,6 +29,7 @@ final class RunQueryTool implements DbTool {
         return Json.parseObject("""
                 {"type":"object","properties":{
                   "connection":{"type":"string","description":"Connection name or id. Defaults to the selected connection."},
+                  "schema":{"type":"string","description":"Schema path from list_schemas (e.g. \\"mydb.public\\"). Selects the database the statement runs in; required when the target database is not the connection's default (on PostgreSQL each database is separate and cannot be queried from another). Still qualify table names with their schema."},
                   "sql":{"type":"string","description":"A single read-only SQL statement."},
                   "max_rows":{"type":"integer","description":"Maximum rows to return (capped by the user's settings)."}
                 },"required":["sql"],"additionalProperties":false}""");
@@ -49,7 +50,7 @@ final class RunQueryTool implements DbTool {
         if (requested != null && requested > 0) {
             maxRows = Math.min(requested, maxRows);
         }
-        QueryResult result = gateway.runReadQuery(conn.id(), sql, maxRows, ctx.cancel());
+        QueryResult result = gateway.runReadQuery(conn.id(), Args.optString(args, "schema"), sql, maxRows, ctx.cancel());
         String header = result.rows().size() + " linha(s)"
                 + (result.truncated() ? " (limite de " + maxRows + " atingido; pode haver mais)" : "") + "\n";
         return ToolOutcome.ok(header + TextTable.format(result, ctx.limits().maxResultChars()));

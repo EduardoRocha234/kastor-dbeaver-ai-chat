@@ -1,5 +1,7 @@
 package io.github.eduardo.dbeaver.aichat.ui;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import io.github.eduardo.dbeaver.aichat.core.Json;
 import io.github.eduardo.dbeaver.aichat.core.render.MarkdownRenderer;
 import io.github.eduardo.dbeaver.aichat.core.tools.ApprovalRequest;
@@ -8,6 +10,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -43,6 +46,32 @@ final class ChatBrowserBridge {
         void openSql(String sql);
 
         void copy(String text);
+
+        /** The user pressed Enter or the send button in the page's composer. */
+        void send(String text);
+
+        void stop();
+
+        /** An "@" query typed in the composer; answer with {@link ChatBrowserBridge#showMentions}. */
+        void mention(int seq, String query);
+
+        void selectProvider(String id);
+
+        /** id "" = the active editor's connection. */
+        void selectConnection(String id);
+
+        void toggleContext(boolean include);
+
+        void newConversation();
+
+        /** The sidebar opened; answer with {@link ChatBrowserBridge#setConversations}. */
+        void listConversations();
+
+        void openConversation(String id);
+
+        void deleteConversation(String id);
+
+        void openSettings();
     }
 
     private static final Log log = Log.getLog(ChatBrowserBridge.class);
@@ -57,6 +86,8 @@ final class ChatBrowserBridge {
     private Browser browser;
     private boolean ready;
     private boolean pageLoaded;
+    /** Latest call of each page-state function (theme, selectors, title...), re-applied after a reload. */
+    private final Map<String, String> state = new LinkedHashMap<>();
 
     ChatBrowserBridge(Composite parent, Callbacks callbacks) {
         this.callbacks = callbacks;
@@ -79,16 +110,31 @@ final class ChatBrowserBridge {
         function("aichatOpenSql", callbacks::openSql);
         function("aichatCopy", callbacks::copy);
         function("aichatOpenLink", ChatBrowserBridge::openLink);
+        function("aichatSend", callbacks::send);
+        function("aichatStop", arg -> callbacks.stop());
+        function("aichatSelectProvider", callbacks::selectProvider);
+        function("aichatSelectConnection", callbacks::selectConnection);
+        function("aichatToggleContext", arg -> callbacks.toggleContext(Boolean.parseBoolean(arg)));
+        function("aichatNewConversation", arg -> callbacks.newConversation());
+        function("aichatListConversations", arg -> callbacks.listConversations());
+        function("aichatOpenConversation", callbacks::openConversation);
+        function("aichatDeleteConversation", callbacks::deleteConversation);
+        function("aichatOpenSettings", arg -> callbacks.openSettings());
+        function("aichatMention", arg -> {
+            JsonObject request = Json.parseObject(arg);
+            callbacks.mention(request.get("seq").getAsInt(), request.get("query").getAsString());
+        });
         browser.addProgressListener(ProgressListener.completedAdapter(e -> {
             if (created != browser) {
                 return;
             }
-            log.info("AI Chat: página do chat carregada (" + browser.getBrowserType() + ")");
+            log.info("Kastor: página do chat carregada (" + browser.getBrowserType() + ")");
             pageLoaded = true;
             ready = true;
+            pending.addAll(0, state.values());
             for (String script : pending) {
                 if (!browser.execute(script)) {
-                    log.info("AI Chat: script falhou ao carregar a página: " + abbreviate(script));
+                    log.info("Kastor: script falhou ao carregar a página: " + abbreviate(script));
                 }
             }
             pending.clear();
@@ -98,12 +144,12 @@ final class ChatBrowserBridge {
         // setText arrives as "about:blank" (IE, WebKit) or "data:text/html..." (Edge NavigateToString).
         browser.addLocationListener(LocationListener.changingAdapter(e -> {
             if (pageLoaded || !isInitialPage(e.location)) {
-                log.info("AI Chat: navegação bloqueada: " + abbreviate(String.valueOf(e.location)));
+                log.info("Kastor: navegação bloqueada: " + abbreviate(String.valueOf(e.location)));
                 e.doit = false;
             }
         }));
         browser.setText(loadPage());
-        log.info("AI Chat: navegador criado (" + browser.getBrowserType() + ")");
+        log.info("Kastor: navegador criado (" + browser.getBrowserType() + ")");
     }
 
     private static boolean isInitialPage(String location) {
@@ -119,7 +165,7 @@ final class ChatBrowserBridge {
             return;
         }
         ancestors = now;
-        log.info("AI Chat: painel movido; recriando o navegador");
+        log.info("Kastor: painel movido; recriando o navegador");
         browser.dispose();
         createBrowserWidget();
         pending.clear();
@@ -188,10 +234,87 @@ final class ChatBrowserBridge {
         call("addError", text);
     }
 
-    private void call(String function, Object... args) {
+    void setTheme(boolean dark) {
+        stateCall("setTheme", dark);
+    }
+
+    void setRunning(boolean running) {
+        stateCall("setRunning", running);
+    }
+
+    /** entries: {id, label}. */
+    void setProviders(JsonArray entries, String activeId) {
+        stateCall("setProviders", entries, activeId);
+    }
+
+    /** entries: {id, label}; id "" = the active editor's connection. */
+    void setConnections(JsonArray entries, String selectedId) {
+        stateCall("setConnections", entries, selectedId);
+    }
+
+    void setEditorContext(String text, boolean include) {
+        stateCall("setEditorContext", text, include);
+    }
+
+    /** Adds "@path" mentions at the composer's caret. */
+    void insertMentions(List<String> paths) {
+        if (!paths.isEmpty()) {
+            transientCall("insertMentions", paths);
+        }
+    }
+
+    void setVersion(String version) {
+        stateCall("setVersion", version);
+    }
+
+    void setTitle(String title) {
+        stateCall("setTitle", title);
+    }
+
+    /** entries: {id, title, updatedAt}. */
+    void setConversations(JsonArray entries, String activeId) {
+        transientCall("setConversations", entries, activeId);
+    }
+
+    private void stateCall(String function, Object... args) {
+        state.put(function, script(function, args));
+        transientCall(function, args);
+    }
+
+    void clearInput() {
+        transientCall("clearInput");
+    }
+
+    void setInput(String text, boolean selectAll) {
+        transientCall("setInput", text, selectAll);
+    }
+
+    /** Focuses the browser widget and the composer inside it. */
+    void focusInput() {
+        if (!browser.isDisposed()) {
+            browser.setFocus();
+        }
+        transientCall("focusInput");
+    }
+
+    void showMentions(int seq, JsonArray entries) {
+        transientCall("showMentions", seq, entries);
+    }
+
+    /** UI state outside the journal: sent now (or once the page loads) but never replayed. */
+    private void transientCall(String function, Object... args) {
         if (host.isDisposed() || browser.isDisposed()) {
             return;
         }
+        String script = script(function, args);
+        if (!ready) {
+            pending.add(script);
+        } else if (!browser.execute(script)) {
+            log.info("Kastor: script falhou: " + function);
+        }
+    }
+
+    private static String script(String function, Object... args) {
         StringBuilder sb = new StringBuilder("ChatUI.").append(function).append('(');
         for (int i = 0; i < args.length; i++) {
             if (i > 0) {
@@ -199,12 +322,19 @@ final class ChatBrowserBridge {
             }
             sb.append(Json.GSON.toJson(args[i]));
         }
-        String script = sb.append(");").toString();
+        return sb.append(");").toString();
+    }
+
+    private void call(String function, Object... args) {
+        if (host.isDisposed() || browser.isDisposed()) {
+            return;
+        }
+        String script = script(function, args);
         record(function, args, script);
         if (!ready) {
             pending.add(script);
         } else if (!browser.execute(script)) {
-            log.info("AI Chat: script falhou: " + function);
+            log.info("Kastor: script falhou: " + function);
         }
     }
 

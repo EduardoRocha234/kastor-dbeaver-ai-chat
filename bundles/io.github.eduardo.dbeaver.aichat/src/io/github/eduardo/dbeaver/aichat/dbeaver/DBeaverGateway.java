@@ -4,6 +4,7 @@ import io.github.eduardo.dbeaver.aichat.core.CancellationToken;
 import io.github.eduardo.dbeaver.aichat.core.CancelledException;
 import io.github.eduardo.dbeaver.aichat.core.sql.SqlClassifier.SqlKind;
 import io.github.eduardo.dbeaver.aichat.core.tools.ColumnInfo;
+import io.github.eduardo.dbeaver.aichat.core.tools.ContainerInfo;
 import io.github.eduardo.dbeaver.aichat.core.tools.ConnectionInfo;
 import io.github.eduardo.dbeaver.aichat.core.tools.DatabaseGateway;
 import io.github.eduardo.dbeaver.aichat.core.tools.ForeignKeyInfo;
@@ -138,6 +139,36 @@ public final class DBeaverGateway implements DatabaseGateway {
     }
 
     @Override
+    public List<ContainerInfo> listContainers(String connectionId, String parent) throws GatewayException {
+        DBRProgressMonitor monitor = new VoidProgressMonitor();
+        DBPDataSource ds = connect(container(connectionId));
+        List<ContainerInfo> out = new ArrayList<>();
+        try {
+            DBSObjectContainer scope = parent == null ? root(ds) : resolveContainer(ds, parent, monitor);
+            for (DBSObject child : children(scope, monitor)) {
+                if (child instanceof DBSCatalog) {
+                    out.add(new ContainerInfo(child.getName(), holdsSchemas((DBSCatalog) child, monitor)));
+                } else if (child instanceof DBSSchema) {
+                    out.add(new ContainerInfo(child.getName(), false));
+                }
+            }
+        } catch (DBException e) {
+            throw new GatewayException("Falha ao ler " + (parent == null ? "bancos" : parent) + ": " + e.getMessage(), e);
+        }
+        return out;
+    }
+
+    /** Asks the catalog's declared child type instead of loading its children (which would connect to it). */
+    private static boolean holdsSchemas(DBSCatalog catalog, DBRProgressMonitor monitor) {
+        try {
+            Class<? extends DBSObject> type = catalog.getPrimaryChildType(monitor);
+            return type != null && DBSSchema.class.isAssignableFrom(type);
+        } catch (DBException | RuntimeException e) {
+            return false;
+        }
+    }
+
+    @Override
     public List<TableInfo> listTables(String connectionId, String schema, String nameFilter, int limit)
             throws GatewayException {
         DBRProgressMonitor monitor = new VoidProgressMonitor();
@@ -221,9 +252,9 @@ public final class DBeaverGateway implements DatabaseGateway {
     }
 
     @Override
-    public QueryResult runReadQuery(String connectionId, String sql, int maxRows, CancellationToken cancel)
-            throws GatewayException {
-        ContextHandle handle = context(connectionId);
+    public QueryResult runReadQuery(String connectionId, String schema, String sql, int maxRows,
+            CancellationToken cancel) throws GatewayException {
+        ContextHandle handle = context(connectionId, schema);
         if (!handle.isolated()) {
             // Without our own transaction a read can't be rolled back and would run in the
             // user's editor session; the classifier alone is not enough of a barrier.
@@ -231,7 +262,7 @@ public final class DBeaverGateway implements DatabaseGateway {
                     + "consultas pelo chat estão bloqueadas nela.", null);
         }
         DBRProgressMonitor monitor = new VoidProgressMonitor();
-        try (DBCSession session = handle.context().openSession(monitor, DBCExecutionPurpose.UTIL, "AI Chat query")) {
+        try (DBCSession session = handle.context().openSession(monitor, DBCExecutionPurpose.UTIL, "Kastor query")) {
             DBCTransactionManager txn = DBUtils.getTransactionManager(handle.context());
             DBeaverCompat.setReadOnly(session, true);
             try (DBCStatement statement = session.prepareStatement(DBCStatementType.QUERY, sql, false, false, false);
@@ -276,15 +307,16 @@ public final class DBeaverGateway implements DatabaseGateway {
     }
 
     @Override
-    public long executeUpdate(String connectionId, String sql, CancellationToken cancel) throws GatewayException {
-        ContextHandle handle = context(connectionId);
+    public long executeUpdate(String connectionId, String schema, String sql, CancellationToken cancel)
+            throws GatewayException {
+        ContextHandle handle = context(connectionId, schema);
         if (!handle.isolated()) {
             // Same reason as reads: we can't commit or roll back on the user's session.
             throw new GatewayException("Esta conexão não permite abrir uma transação separada para o chat; "
                     + "comandos pelo chat estão bloqueados nela.", null);
         }
         DBRProgressMonitor monitor = new VoidProgressMonitor();
-        try (DBCSession session = handle.context().openSession(monitor, DBCExecutionPurpose.USER, "AI Chat write")) {
+        try (DBCSession session = handle.context().openSession(monitor, DBCExecutionPurpose.USER, "Kastor write")) {
             DBCTransactionManager txn = DBUtils.getTransactionManager(handle.context());
             DBeaverCompat.setReadOnly(session, false);
             try (DBCStatement statement = session.prepareStatement(DBCStatementType.QUERY, sql, false, false, false);
@@ -352,18 +384,20 @@ public final class DBeaverGateway implements DatabaseGateway {
         return ds;
     }
 
-    private synchronized ContextHandle context(String connectionId) throws GatewayException {
+    /** One context per connection and database: on PostgreSQL every database is its own instance. */
+    private synchronized ContextHandle context(String connectionId, String schema) throws GatewayException {
         DBPDataSource ds = connect(container(connectionId));
-        ContextHandle existing = contexts.get(connectionId);
+        DBRProgressMonitor monitor = new VoidProgressMonitor();
+        DBSInstance instance = instance(ds, schema, monitor);
+        String key = connectionId + '\u0000' + instance.getName();
+        ContextHandle existing = contexts.get(key);
         if (existing != null && existing.context().getDataSource() == ds && existing.context().isConnected()) {
             return existing;
         }
-        DBRProgressMonitor monitor = new VoidProgressMonitor();
-        DBSInstance instance = ds.getDefaultInstance();
         DBCExecutionContext defaultContext = instance.getDefaultContext(monitor, false);
         ContextHandle handle;
         try {
-            DBCExecutionContext isolated = instance.openIsolatedContext(monitor, "AI Chat", defaultContext);
+            DBCExecutionContext isolated = instance.openIsolatedContext(monitor, "Kastor", defaultContext);
             DBCTransactionManager txn = DBUtils.getTransactionManager(isolated);
             if (txn != null && txn.isAutoCommit()) {
                 txn.setAutoCommit(monitor, false);
@@ -373,8 +407,21 @@ public final class DBeaverGateway implements DatabaseGateway {
             log.debug("Isolated context not available, using default context", e);
             handle = new ContextHandle(defaultContext, false);
         }
-        contexts.put(connectionId, handle);
+        contexts.put(key, handle);
         return handle;
+    }
+
+    /** The instance (database) owning the schema path; the default instance when schema is null. */
+    private DBSInstance instance(DBPDataSource ds, String schema, DBRProgressMonitor monitor) throws GatewayException {
+        if (schema == null) {
+            return ds.getDefaultInstance();
+        }
+        try {
+            DBSInstance owner = DBUtils.getObjectOwnerInstance(resolveContainer(ds, schema, monitor));
+            return owner == null ? ds.getDefaultInstance() : owner;
+        } catch (DBException e) {
+            throw new GatewayException("Falha ao localizar " + schema + ": " + e.getMessage(), e);
+        }
     }
 
     private static DBSObjectContainer root(DBPDataSource ds) throws GatewayException {

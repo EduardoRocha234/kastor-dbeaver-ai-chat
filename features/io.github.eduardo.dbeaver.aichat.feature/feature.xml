@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <feature
       id="io.github.eduardo.dbeaver.aichat.feature"
-      label="DBeaver AI Chat"
+      label="Kastor - DBeaver AI Chat"
       version="0.1.0.qualifier"
       provider-name="Eduardo">
 
