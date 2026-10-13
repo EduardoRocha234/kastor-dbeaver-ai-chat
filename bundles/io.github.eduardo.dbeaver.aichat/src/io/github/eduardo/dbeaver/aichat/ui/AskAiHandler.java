@@ -14,6 +14,7 @@ public class AskAiHandler extends AbstractHandler {
     public Object execute(ExecutionEvent event) throws ExecutionException {
         IWorkbenchWindow window = HandlerUtil.getActiveWorkbenchWindowChecked(event);
         try {
+            ChatPlacement.dockRightIfNew(window);
             ChatView view = (ChatView) window.getActivePage().showView(ChatView.ID);
             view.focusWithEditorContext();
         } catch (PartInitException e) {

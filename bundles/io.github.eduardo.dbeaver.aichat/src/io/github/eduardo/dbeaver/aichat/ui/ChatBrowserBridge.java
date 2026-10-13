@@ -7,7 +7,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.SWTError;
@@ -15,12 +17,20 @@ import org.eclipse.swt.browser.Browser;
 import org.eclipse.swt.browser.BrowserFunction;
 import org.eclipse.swt.browser.LocationListener;
 import org.eclipse.swt.browser.ProgressListener;
+import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.program.Program;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.jkiss.dbeaver.Log;
 
-/** Owns the Browser widget: Java -> JS calls (queued until the page loads) and JS -> Java callbacks. */
+/**
+ * Owns the Browser widget: Java -> JS calls (queued until the page loads) and JS -> Java callbacks.
+ *
+ * <p>Moving the view to another stack re-parents the widget, and the Edge (WebView2) browser of
+ * older SWT releases stops painting after that. So every call since the last {@code clear} is kept
+ * in a journal; when the widget's ancestors change, the browser is recreated and the journal
+ * replayed, which also brings back pending approval cards.
+ */
 final class ChatBrowserBridge {
 
     interface Callbacks {
@@ -37,14 +47,32 @@ final class ChatBrowserBridge {
 
     private static final Log log = Log.getLog(ChatBrowserBridge.class);
 
-    private final Browser browser;
+    private final Composite host;
+    private final Callbacks callbacks;
     private final MarkdownRenderer markdown = new MarkdownRenderer();
+    private final List<String> journal = new ArrayList<>();
+    private final Map<String, Integer> htmlEntries = new HashMap<>();
     private final List<String> pending = new ArrayList<>();
+    private List<Composite> ancestors;
+    private Browser browser;
     private boolean ready;
     private boolean pageLoaded;
 
     ChatBrowserBridge(Composite parent, Callbacks callbacks) {
-        browser = createBrowser(parent);
+        this.callbacks = callbacks;
+        host = new Composite(parent, SWT.NONE);
+        host.setLayout(new FillLayout());
+        createBrowserWidget();
+        ancestors = ancestors(host);
+        host.addListener(SWT.Resize, e -> recreateIfReparented());
+        host.addListener(SWT.Show, e -> recreateIfReparented());
+    }
+
+    private void createBrowserWidget() {
+        Browser created = createBrowser(host);
+        browser = created;
+        ready = false;
+        pageLoaded = false;
         function("aichatApprove", callbacks::approve);
         function("aichatReject", callbacks::reject);
         function("aichatInsertSql", callbacks::insertSql);
@@ -52,10 +80,16 @@ final class ChatBrowserBridge {
         function("aichatCopy", callbacks::copy);
         function("aichatOpenLink", ChatBrowserBridge::openLink);
         browser.addProgressListener(ProgressListener.completedAdapter(e -> {
+            if (created != browser) {
+                return;
+            }
+            log.info("AI Chat: página do chat carregada (" + browser.getBrowserType() + ")");
             pageLoaded = true;
             ready = true;
             for (String script : pending) {
-                browser.execute(script);
+                if (!browser.execute(script)) {
+                    log.info("AI Chat: script falhou ao carregar a página: " + abbreviate(script));
+                }
             }
             pending.clear();
         }));
@@ -67,14 +101,41 @@ final class ChatBrowserBridge {
             }
         }));
         browser.setText(loadPage());
+        log.info("AI Chat: navegador criado (" + browser.getBrowserType() + ")");
+    }
+
+    private void recreateIfReparented() {
+        if (host.isDisposed()) {
+            return;
+        }
+        List<Composite> now = ancestors(host);
+        if (now.equals(ancestors)) {
+            return;
+        }
+        ancestors = now;
+        log.info("AI Chat: painel movido; recriando o navegador");
+        browser.dispose();
+        createBrowserWidget();
+        pending.clear();
+        pending.addAll(journal);
+        host.layout(true, true);
+    }
+
+    /** Identity list of the widget's parents up to the shell. */
+    private static List<Composite> ancestors(Control control) {
+        List<Composite> list = new ArrayList<>();
+        for (Composite p = control.getParent(); p != null; p = p.getParent()) {
+            list.add(p);
+        }
+        return list;
     }
 
     Control control() {
-        return browser;
+        return host;
     }
 
     boolean isDisposed() {
-        return browser.isDisposed();
+        return host.isDisposed();
     }
 
     void clear() {
@@ -122,7 +183,7 @@ final class ChatBrowserBridge {
     }
 
     private void call(String function, Object... args) {
-        if (browser.isDisposed()) {
+        if (host.isDisposed() || browser.isDisposed()) {
             return;
         }
         StringBuilder sb = new StringBuilder("ChatUI.").append(function).append('(');
@@ -133,11 +194,34 @@ final class ChatBrowserBridge {
             sb.append(Json.GSON.toJson(args[i]));
         }
         String script = sb.append(");").toString();
+        record(function, args, script);
         if (!ready) {
             pending.add(script);
         } else if (!browser.execute(script)) {
-            log.debug("Chat script failed: " + function);
+            log.info("AI Chat: script falhou: " + function);
         }
+    }
+
+    /** Keeps the journal replayable: clear resets it, re-renders of a message replace the old one. */
+    private void record(String function, Object[] args, String script) {
+        if ("clear".equals(function)) {
+            journal.clear();
+            htmlEntries.clear();
+            return;
+        }
+        if ("setAssistantHtml".equals(function)) {
+            Integer index = htmlEntries.get(String.valueOf(args[0]));
+            if (index != null) {
+                journal.set(index, script);
+                return;
+            }
+            htmlEntries.put(String.valueOf(args[0]), journal.size());
+        }
+        journal.add(script);
+    }
+
+    private static String abbreviate(String s) {
+        return s.length() <= 80 ? s : s.substring(0, 80) + "...";
     }
 
     private void function(String name, Consumer<String> handler) {

@@ -14,6 +14,7 @@ public class OpenChatHandler extends AbstractHandler {
     public Object execute(ExecutionEvent event) throws ExecutionException {
         IWorkbenchWindow window = HandlerUtil.getActiveWorkbenchWindowChecked(event);
         try {
+            ChatPlacement.dockRightIfNew(window);
             window.getActivePage().showView(ChatView.ID);
         } catch (PartInitException e) {
             throw new ExecutionException("Não foi possível abrir o AI Chat", e);
