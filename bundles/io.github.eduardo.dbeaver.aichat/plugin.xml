@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?eclipse version="3.4"?>
 <plugin>
+   <extension point="org.eclipse.ui.views">
+      <view
+            id="io.github.eduardo.dbeaver.aichat.view"
+            name="AI Chat"
+            category="org.jkiss.dbeaver.core.category"
+            class="io.github.eduardo.dbeaver.aichat.ui.ChatView"
+            restorable="true"/>
+   </extension>
    <extension point="org.eclipse.ui.preferencePages">
       <page
             id="io.github.eduardo.dbeaver.aichat.preferences"

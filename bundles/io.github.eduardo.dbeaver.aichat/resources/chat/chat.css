@@ -1,0 +1,28 @@
+body { font-family: "Segoe UI", system-ui, sans-serif; font-size: 13px; margin: 0; padding: 8px; color: #1f2328; background: #ffffff; }
+.msg { margin: 8px 0; padding: 8px 10px; border-radius: 6px; line-height: 1.45; overflow-wrap: anywhere; }
+.msg.user { background: #e8f0fe; white-space: pre-wrap; }
+.msg.assistant { background: #f6f8fa; }
+.msg.assistant p { margin: 4px 0; }
+pre { background: #eef1f4; padding: 8px; border-radius: 4px; overflow-x: auto; font-family: Consolas, "Courier New", monospace; font-size: 12px; white-space: pre; }
+code { font-family: Consolas, "Courier New", monospace; }
+table { border-collapse: collapse; margin: 4px 0; }
+th, td { border: 1px solid #d0d7de; padding: 2px 6px; }
+.code-actions { margin: -4px 0 8px; }
+.code-actions button, .approval button { margin-right: 6px; font-size: 12px; cursor: pointer; }
+details.tool { margin: 6px 0; border: 1px solid #d0d7de; border-radius: 6px; padding: 4px 8px; font-size: 12px; }
+details.tool summary { cursor: pointer; color: #57606a; }
+details.tool.error summary { color: #cf222e; }
+.approval { border: 2px solid #bf8700; background: #fff8c5; border-radius: 6px; padding: 8px; margin: 8px 0; }
+.approval .title { font-weight: 600; }
+.approval .reason { margin: 4px 0; font-style: italic; }
+.decision { font-weight: 600; margin-top: 4px; }
+.notice { color: #57606a; font-style: italic; margin: 6px 0; }
+.error-msg { color: #cf222e; background: #ffebe9; border-radius: 6px; padding: 6px 8px; margin: 6px 0; white-space: pre-wrap; }
+@media (prefers-color-scheme: dark) {
+  body { color: #e6edf3; background: #1e1f22; }
+  .msg.user { background: #1f3354; }
+  .msg.assistant, pre { background: #2b2d30; }
+  th, td, details.tool { border-color: #444c56; }
+  .approval { background: #3d2e00; }
+  .error-msg { background: #4a1d1d; }
+}
