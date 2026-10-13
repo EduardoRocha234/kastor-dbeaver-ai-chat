@@ -1,0 +1,10 @@
+target/
+!releng/target/
+.dbeaver/
+releng/target/dbeaver.target
+bundles/*/lib/
+.idea/
+.classpath
+.project
+.settings/
+*.iml
