@@ -8,7 +8,9 @@ VERSION="${1:-24.1.0}"
 EXTRA=()
 # Newer DBeaver releases ship Eclipse bundles that require Java 21: resolve with JavaSE-21 on a JDK 21.
 # The bytecode stays Java 17 (tycho-compiler release 17), so the same jar runs on DBeaver 24.1.
-if unzip -p "$ROOT/.dbeaver/$VERSION/dbeaver/plugins"/org.eclipse.jface_*.jar META-INF/MANIFEST.MF 2>/dev/null | grep -q 'JavaSE-21'; then
+# Read the manifest first: piping into grep -q can SIGPIPE unzip, which pipefail turns into a false negative.
+JFACE_MANIFEST="$(unzip -p "$ROOT/.dbeaver/$VERSION/dbeaver/plugins"/org.eclipse.jface_*.jar META-INF/MANIFEST.MF 2>/dev/null || true)"
+if grep -q 'JavaSE-21' <<<"$JFACE_MANIFEST"; then
   export JAVA_HOME="$HOME/.local/opt/jdk-21"
   export PATH="$JAVA_HOME/bin:$PATH"
   EXTRA+=(-Daichat.resolveEE=JavaSE-21)
