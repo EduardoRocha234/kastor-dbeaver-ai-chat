@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?eclipse version="3.4"?>
 <plugin>
+   <extension point="org.eclipse.ui.preferencePages">
+      <page
+            id="io.github.eduardo.dbeaver.aichat.preferences"
+            name="AI Chat"
+            class="io.github.eduardo.dbeaver.aichat.settings.AiChatPreferencePage"/>
+   </extension>
 </plugin>

@@ -24,4 +24,9 @@ public class Activator extends AbstractUIPlugin {
     public static Activator getDefault() {
         return plugin;
     }
+
+    /** {workspace}/.metadata/.plugins/io.github.eduardo.dbeaver.aichat/conversations */
+    public java.nio.file.Path conversationsDir() {
+        return getStateLocation().append("conversations").toFile().toPath();
+    }
 }
