@@ -95,13 +95,19 @@ final class ChatBrowserBridge {
         }));
         // Only the initial setText load may navigate; anything later (even about:blank from a
         // sanitized link) would reload an empty page and lose the conversation and approvals.
+        // setText arrives as "about:blank" (IE, WebKit) or "data:text/html..." (Edge NavigateToString).
         browser.addLocationListener(LocationListener.changingAdapter(e -> {
-            if (pageLoaded || (e.location != null && !e.location.startsWith("about:"))) {
+            if (pageLoaded || !isInitialPage(e.location)) {
+                log.info("AI Chat: navegação bloqueada: " + abbreviate(String.valueOf(e.location)));
                 e.doit = false;
             }
         }));
         browser.setText(loadPage());
         log.info("AI Chat: navegador criado (" + browser.getBrowserType() + ")");
+    }
+
+    private static boolean isInitialPage(String location) {
+        return location == null || location.startsWith("about:") || location.startsWith("data:text/html");
     }
 
     private void recreateIfReparented() {
