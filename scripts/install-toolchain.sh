@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs JDK 17 (Temurin) and Maven 3.9.9 under ~/.local/opt, no sudo needed.
+# Installs JDK 17 and 21 (Temurin) and Maven 3.9.9 under ~/.local/opt, no sudo needed.
 set -euo pipefail
 OPT="$HOME/.local/opt"
 TMP="$(mktemp -d)"
@@ -10,10 +10,16 @@ if [ ! -x "$OPT/jdk-17/bin/java" ]; then
   mkdir -p "$OPT/jdk-17"
   tar -xzf "$TMP/jdk.tar.gz" -C "$OPT/jdk-17" --strip-components=1
 fi
+if [ ! -x "$OPT/jdk-21/bin/java" ]; then
+  curl -fsSL -o "$TMP/jdk21.tar.gz" "https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jdk/hotspot/normal/eclipse"
+  mkdir -p "$OPT/jdk-21"
+  tar -xzf "$TMP/jdk21.tar.gz" -C "$OPT/jdk-21" --strip-components=1
+fi
 if [ ! -x "$OPT/maven/bin/mvn" ]; then
   curl -fsSL -o "$TMP/maven.tar.gz" "https://archive.apache.org/dist/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz"
   mkdir -p "$OPT/maven"
   tar -xzf "$TMP/maven.tar.gz" -C "$OPT/maven" --strip-components=1
 fi
 "$OPT/jdk-17/bin/java" -version
+"$OPT/jdk-21/bin/java" -version
 JAVA_HOME="$OPT/jdk-17" "$OPT/maven/bin/mvn" -v

@@ -11,6 +11,7 @@
   <properties>
     <tycho.version>4.0.10</tycho.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <aichat.resolveEE>JavaSE-17</aichat.resolveEE>
   </properties>
 
   <modules>
@@ -30,6 +31,15 @@
       </plugin>
       <plugin>
         <groupId>org.eclipse.tycho</groupId>
+        <artifactId>tycho-compiler-plugin</artifactId>
+        <version>${tycho.version}</version>
+        <configuration>
+          <!-- Java 17 bytecode even when the build runs on JDK 21 (DBeaver 24.1 ships JRE 17). -->
+          <release>17</release>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.eclipse.tycho</groupId>
         <artifactId>target-platform-configuration</artifactId>
         <version>${tycho.version}</version>
         <configuration>
@@ -37,6 +47,9 @@
             <file>${maven.multiModuleProjectDirectory}/releng/target/dbeaver.target</file>
           </target>
           <pomDependencies>ignore</pomDependencies>
+          <!-- Newer DBeaver releases ship Eclipse bundles that require JavaSE-21. scripts/verify.sh latest
+               resolves with -Daichat.resolveEE=JavaSE-21 on a JDK 21; the compiler still emits Java 17 bytecode. -->
+          <executionEnvironment>${aichat.resolveEE}</executionEnvironment>
           <environments>
             <environment>
               <os>linux</os>

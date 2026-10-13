@@ -6,7 +6,7 @@ Bundle-Version: 0.1.0.qualifier
 Bundle-Vendor: Eduardo
 Bundle-Activator: io.github.eduardo.dbeaver.aichat.Activator
 Bundle-ActivationPolicy: lazy
-Bundle-RequiredExecutionEnvironment: JavaSE-17
+Require-Capability: osgi.ee;filter:="(&(osgi.ee=JavaSE)(version>=17))"
 Automatic-Module-Name: io.github.eduardo.dbeaver.aichat
 Bundle-ClassPath: .,
  lib/aichat-core.jar,

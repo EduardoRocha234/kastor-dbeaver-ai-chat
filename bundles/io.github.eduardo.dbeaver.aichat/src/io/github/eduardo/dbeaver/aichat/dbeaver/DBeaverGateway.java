@@ -310,11 +310,7 @@ public final class DBeaverGateway implements DatabaseGateway {
     public void close() {
         for (ContextHandle handle : contexts.values()) {
             if (handle.isolated()) {
-                try {
-                    handle.context().close();
-                } catch (RuntimeException e) {
-                    log.debug("Error closing AI Chat context", e);
-                }
+                DBeaverCompat.closeQuietly(handle.context());
             }
         }
         contexts.clear();

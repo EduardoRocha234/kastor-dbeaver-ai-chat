@@ -12,6 +12,7 @@ import org.eclipse.ui.IWorkbenchWindow;
 import org.jkiss.dbeaver.Log;
 import org.jkiss.dbeaver.model.DBPDataSource;
 import org.jkiss.dbeaver.model.DBPDataSourceContainer;
+import org.jkiss.dbeaver.model.exec.DBCExecutionContext;
 import org.jkiss.dbeaver.model.sql.SQLQuery;
 import org.jkiss.dbeaver.model.sql.SQLQueryType;
 import org.jkiss.dbeaver.ui.editors.sql.SQLEditor;
@@ -29,6 +30,30 @@ public final class DBeaverCompat {
     private DBeaverCompat() {
     }
 
+    /** 24.x spells it {@code isModifiyng()}, newer releases {@code isModifying()}; null when neither exists. */
+    private static Boolean isModifying(SQLQuery query) {
+        for (String name : new String[] {"isModifying", "isModifiyng"}) {
+            try {
+                return (Boolean) SQLQuery.class.getMethod(name).invoke(query);
+            } catch (NoSuchMethodException e) {
+                // try the other spelling
+            } catch (ReflectiveOperationException e) {
+                log.debug("SQLQuery." + name + " failed", e);
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /** Closes an execution context; {@code close()} declares {@code DBException} in newer releases. */
+    public static void closeQuietly(DBCExecutionContext context) {
+        try {
+            context.close();
+        } catch (Exception | LinkageError e) {
+            log.debug("Error closing AI Chat context", e);
+        }
+    }
+
     /** DBeaver's own SQL parser as a second opinion; empty when it has no opinion or is unavailable. */
     public static Optional<SqlKind> classifyNative(DBPDataSource dataSource, String sql) {
         try {
@@ -38,8 +63,11 @@ public final class DBeaverCompat {
                 return Optional.empty();
             }
             if (type == SQLQueryType.SELECT) {
-                // DBeaver spells it "isModifiyng"; a rename in a later version lands in the LinkageError catch below.
-                return Optional.of(query.isModifiyng() ? SqlKind.WRITE : SqlKind.READ);
+                Boolean modifying = isModifying(query);
+                if (modifying == null) {
+                    return Optional.empty();
+                }
+                return Optional.of(modifying ? SqlKind.WRITE : SqlKind.READ);
             }
             return Optional.of(SqlKind.WRITE);
         } catch (RuntimeException | LinkageError e) {
