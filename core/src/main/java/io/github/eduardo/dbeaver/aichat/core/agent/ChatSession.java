@@ -8,12 +8,15 @@ import io.github.eduardo.dbeaver.aichat.core.llm.ChatRequest;
 import io.github.eduardo.dbeaver.aichat.core.llm.LlmException;
 import io.github.eduardo.dbeaver.aichat.core.llm.LlmProvider;
 import io.github.eduardo.dbeaver.aichat.core.llm.ProviderConfig;
+import io.github.eduardo.dbeaver.aichat.core.llm.Role;
 import io.github.eduardo.dbeaver.aichat.core.llm.StopReason;
 import io.github.eduardo.dbeaver.aichat.core.llm.ToolCall;
 import io.github.eduardo.dbeaver.aichat.core.tools.ToolContext;
 import io.github.eduardo.dbeaver.aichat.core.tools.ToolOutcome;
 import io.github.eduardo.dbeaver.aichat.core.tools.ToolRegistry;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /** Runs one user turn: model -> tools -> model ... until a final answer, a stop, or the iteration limit. */
 public final class ChatSession {
@@ -64,10 +67,35 @@ public final class ChatSession {
             listener.onNotice("Cancelado.");
         } catch (LlmException e) {
             listener.onError(e.getMessage());
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             listener.onError("Erro inesperado: " + e);
         } finally {
+            closeDangling();
             listener.onTurnFinished();
+        }
+    }
+
+    /**
+     * Every tool call of the last assistant message must have a result, or the next request is
+     * rejected by the provider (HTTP 400). Normal paths already guarantee it; this covers the rest.
+     */
+    private void closeDangling() {
+        List<ChatMessage> messages = conversation.messages();
+        Set<String> answered = new HashSet<>();
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            ChatMessage message = messages.get(i);
+            if (message.role() == Role.TOOL) {
+                answered.add(message.toolCallId());
+            } else if (message.role() == Role.ASSISTANT) {
+                for (ToolCall call : message.toolCalls()) {
+                    if (!answered.contains(call.id())) {
+                        conversation.add(ChatMessage.toolResult(call.id(), "Não executado: erro interno.", true));
+                    }
+                }
+                return;
+            } else {
+                return;
+            }
         }
     }
 

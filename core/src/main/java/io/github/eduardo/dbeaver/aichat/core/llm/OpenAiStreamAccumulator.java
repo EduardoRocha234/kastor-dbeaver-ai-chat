@@ -7,6 +7,7 @@ import com.google.gson.JsonParser;
 import io.github.eduardo.dbeaver.aichat.core.Json;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.TreeMap;
 import java.util.function.Consumer;
 
@@ -87,7 +88,8 @@ final class OpenAiStreamAccumulator {
     AssistantTurn finish() {
         List<ToolCall> toolCalls = new ArrayList<>();
         calls.forEach((index, p) -> toolCalls.add(
-                new ToolCall(p.id != null ? p.id : "call_" + index, p.name, p.arguments.toString())));
+                new ToolCall(p.id != null && !p.id.isEmpty() ? p.id : "call_" + UUID.randomUUID(),
+                        p.name != null && !p.name.isEmpty() ? p.name : "unknown", p.arguments.toString())));
         StopReason stop;
         switch (finishReason == null ? "" : finishReason) {
             case "length":

@@ -35,6 +35,15 @@
     if (actions) { actions.parentNode.replaceChild(el('div', 'decision', label), actions); }
   }
 
+  // Links never navigate the chat page (that would wipe it); http(s) ones open outside.
+  document.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest ? e.target.closest('a') : null;
+    if (!a) { return; }
+    e.preventDefault();
+    var href = a.getAttribute('href') || '';
+    if (/^https?:\/\//i.test(href)) { aichatOpenLink(href); }
+  });
+
   window.ChatUI = {
     clear: function () { list.innerHTML = ''; },
     addUser: function (text) { list.appendChild(el('div', 'msg user', text)); scroll(); },

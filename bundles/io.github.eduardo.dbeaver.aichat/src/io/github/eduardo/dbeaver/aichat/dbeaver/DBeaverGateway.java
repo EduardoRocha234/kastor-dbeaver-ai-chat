@@ -224,9 +224,16 @@ public final class DBeaverGateway implements DatabaseGateway {
     public QueryResult runReadQuery(String connectionId, String sql, int maxRows, CancellationToken cancel)
             throws GatewayException {
         ContextHandle handle = context(connectionId);
+        if (!handle.isolated()) {
+            // Without our own transaction a read can't be rolled back and would run in the
+            // user's editor session; the classifier alone is not enough of a barrier.
+            throw new GatewayException("Esta conexão não permite abrir uma transação separada para o chat; "
+                    + "consultas pelo chat estão bloqueadas nela.", null);
+        }
         DBRProgressMonitor monitor = new VoidProgressMonitor();
         try (DBCSession session = handle.context().openSession(monitor, DBCExecutionPurpose.UTIL, "AI Chat query")) {
-            DBCTransactionManager txn = handle.isolated() ? DBUtils.getTransactionManager(handle.context()) : null;
+            DBCTransactionManager txn = DBUtils.getTransactionManager(handle.context());
+            DBeaverCompat.setReadOnly(session, true);
             try (DBCStatement statement = session.prepareStatement(DBCStatementType.QUERY, sql, false, false, false);
                     CancellationToken.Registration registration = cancel.onCancel(() -> cancelQuietly(statement, monitor))) {
                 statement.setLimit(0, maxRows + 1L);
@@ -271,9 +278,15 @@ public final class DBeaverGateway implements DatabaseGateway {
     @Override
     public long executeUpdate(String connectionId, String sql, CancellationToken cancel) throws GatewayException {
         ContextHandle handle = context(connectionId);
+        if (!handle.isolated()) {
+            // Same reason as reads: we can't commit or roll back on the user's session.
+            throw new GatewayException("Esta conexão não permite abrir uma transação separada para o chat; "
+                    + "comandos pelo chat estão bloqueados nela.", null);
+        }
         DBRProgressMonitor monitor = new VoidProgressMonitor();
         try (DBCSession session = handle.context().openSession(monitor, DBCExecutionPurpose.USER, "AI Chat write")) {
-            DBCTransactionManager txn = handle.isolated() ? DBUtils.getTransactionManager(handle.context()) : null;
+            DBCTransactionManager txn = DBUtils.getTransactionManager(handle.context());
+            DBeaverCompat.setReadOnly(session, false);
             try (DBCStatement statement = session.prepareStatement(DBCStatementType.QUERY, sql, false, false, false);
                     CancellationToken.Registration registration = cancel.onCancel(() -> cancelQuietly(statement, monitor))) {
                 statement.setStatementTimeout(QUERY_TIMEOUT_SECONDS);

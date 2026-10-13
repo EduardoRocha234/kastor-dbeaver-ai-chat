@@ -93,7 +93,27 @@ class OpenAiCompatibleProviderTest {
             AssistantTurn turn = new OpenAiCompatibleProvider(config(server.baseUrl()), "k", HttpStreaming.defaultClient())
                     .stream(simpleRequest(), t -> { }, new CancellationToken());
             assertEquals(StopReason.TOOL_USE, turn.stopReason());
-            assertEquals("call_0", turn.toolCalls().get(0).id());
+            assertTrue(turn.toolCalls().get(0).id().startsWith("call_"));
+        }
+    }
+
+    @Test
+    void missingToolCallIdsAreUniqueAcrossTurnsAndMissingNameIsFilled() throws Exception {
+        // Without ids, "call_0" would repeat every turn; Anthropic rejects duplicate tool_use ids
+        // if the conversation later switches provider.
+        String body = """
+                data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{}"}}]},"finish_reason":"tool_calls"}]}
+
+                """;
+        try (FakeHttpServer server = new FakeHttpServer()) {
+            server.enqueue(200, body);
+            server.enqueue(200, body);
+            OpenAiCompatibleProvider provider =
+                    new OpenAiCompatibleProvider(config(server.baseUrl()), "k", HttpStreaming.defaultClient());
+            ToolCall first = provider.stream(simpleRequest(), t -> { }, new CancellationToken()).toolCalls().get(0);
+            ToolCall second = provider.stream(simpleRequest(), t -> { }, new CancellationToken()).toolCalls().get(0);
+            assertNotEquals(first.id(), second.id());
+            assertEquals("unknown", first.name());
         }
     }
 

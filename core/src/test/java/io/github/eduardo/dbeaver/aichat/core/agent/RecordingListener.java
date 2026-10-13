@@ -6,7 +6,7 @@ import io.github.eduardo.dbeaver.aichat.core.tools.ToolOutcome;
 import java.util.ArrayList;
 import java.util.List;
 
-final class RecordingListener implements SessionListener {
+class RecordingListener implements SessionListener {
 
     final List<String> events = new ArrayList<>();
 

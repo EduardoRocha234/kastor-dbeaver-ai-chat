@@ -59,7 +59,8 @@ public final class ToolRegistry {
             throw e;
         } catch (ToolException | GatewayException e) {
             return ToolOutcome.error(e.getMessage());
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
+            // LinkageError: a DBeaver API that changed between versions; the chat must survive it.
             return ToolOutcome.error("Erro interno na ferramenta " + call.name() + ": " + e);
         }
     }

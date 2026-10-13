@@ -13,6 +13,8 @@ import org.jkiss.dbeaver.Log;
 import org.jkiss.dbeaver.model.DBPDataSource;
 import org.jkiss.dbeaver.model.DBPDataSourceContainer;
 import org.jkiss.dbeaver.model.exec.DBCExecutionContext;
+import org.jkiss.dbeaver.model.exec.DBCSession;
+import org.jkiss.dbeaver.model.exec.jdbc.JDBCSession;
 import org.jkiss.dbeaver.model.sql.SQLQuery;
 import org.jkiss.dbeaver.model.sql.SQLQueryType;
 import org.jkiss.dbeaver.ui.editors.sql.SQLEditor;
@@ -43,6 +45,23 @@ public final class DBeaverCompat {
             }
         }
         return null;
+    }
+
+    /**
+     * Asks the database itself to refuse writes on this session (JDBC {@code setReadOnly}); a
+     * second barrier behind the SQL classifier. Returns false when the driver can't do it.
+     */
+    public static boolean setReadOnly(DBCSession session, boolean readOnly) {
+        if (!(session instanceof JDBCSession)) {
+            return false;
+        }
+        try {
+            ((JDBCSession) session).setReadOnly(readOnly);
+            return true;
+        } catch (Exception | LinkageError e) {
+            log.debug("setReadOnly(" + readOnly + ") not supported", e);
+            return false;
+        }
     }
 
     /** Closes an execution context; {@code close()} declares {@code DBException} in newer releases. */

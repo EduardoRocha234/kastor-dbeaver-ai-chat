@@ -60,7 +60,13 @@ class SqlClassifierTest {
             "select 'unterminated",
             "select 1 /*! ; delete from t */",
             "select 1--1; delete from t",
-            "select 'a\\'; delete from t; --'"
+            "select 'a\\'; delete from t; --'",
+            // Dialects disagree on where comments and strings end: fail closed.
+            "SELECT 1 --'\n; DELETE FROM t; COMMIT; --'",
+            "SELECT E'\\''; DELETE FROM t; COMMIT; --'",
+            "SELECT '\\''; DROP TABLE t; -- '",
+            "SELECT 1 # '\n; DROP TABLE t; -- '",
+            "explain analyse select f()"
     })
     void writeStatements(String sql) {
         assertEquals(SqlKind.WRITE, SqlClassifier.classify(sql), sql);

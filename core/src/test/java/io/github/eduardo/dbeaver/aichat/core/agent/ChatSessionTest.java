@@ -171,4 +171,38 @@ class ChatSessionTest {
         assertTrue(listener.events.contains("error:HTTP 401: chave inválida"));
         assertEquals("finished", listener.events.get(listener.events.size() - 1));
     }
+    @Test
+    void linkageErrorInToolBecomesErrorResult() {
+        Conversation conversation = Conversation.create();
+        ScriptedProvider provider = new ScriptedProvider().then(toolTurn("t1")).then(text("ok"));
+        RecordingListener listener = new RecordingListener();
+        new ChatSession(conversation, provider, CONFIG, new ToolRegistry(List.of(probe(c -> {
+            throw new NoSuchMethodError("org.jkiss.Foo.bar()");
+        }))), SessionSettings.DEFAULT).runTurn("Oi", "sys", ctx(new CancellationToken()), listener);
+
+        List<ChatMessage> results = conversation.messages().stream().filter(m -> m.role() == Role.TOOL).toList();
+        assertEquals(List.of("t1"), results.stream().map(ChatMessage::toolCallId).toList());
+        assertTrue(results.get(0).error());
+        assertEquals(2, provider.requests.size());
+    }
+
+    @Test
+    void unexpectedErrorStillClosesEveryPendingCall() {
+        Conversation conversation = Conversation.create();
+        ScriptedProvider provider = new ScriptedProvider().then(toolTurn("t1", "t2"));
+        RecordingListener listener = new RecordingListener() {
+            @Override
+            public void onToolStart(ToolCall call) {
+                throw new NoClassDefFoundError("org/eclipse/swt/Foo");
+            }
+        };
+        new ChatSession(conversation, provider, CONFIG, new ToolRegistry(List.of(probe(c -> ToolOutcome.ok("x")))),
+                SessionSettings.DEFAULT).runTurn("Oi", "sys", ctx(new CancellationToken()), listener);
+
+        List<ChatMessage> results = conversation.messages().stream().filter(m -> m.role() == Role.TOOL).toList();
+        assertEquals(List.of("t1", "t2"), results.stream().map(ChatMessage::toolCallId).toList());
+        assertTrue(results.stream().allMatch(ChatMessage::error));
+        assertTrue(listener.events.stream().anyMatch(e -> e.startsWith("error:")));
+        assertEquals("finished", listener.events.get(listener.events.size() - 1));
+    }
 }

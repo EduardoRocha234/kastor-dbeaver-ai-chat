@@ -15,6 +15,7 @@ import org.eclipse.swt.browser.Browser;
 import org.eclipse.swt.browser.BrowserFunction;
 import org.eclipse.swt.browser.LocationListener;
 import org.eclipse.swt.browser.ProgressListener;
+import org.eclipse.swt.program.Program;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.jkiss.dbeaver.Log;
@@ -40,6 +41,7 @@ final class ChatBrowserBridge {
     private final MarkdownRenderer markdown = new MarkdownRenderer();
     private final List<String> pending = new ArrayList<>();
     private boolean ready;
+    private boolean pageLoaded;
 
     ChatBrowserBridge(Composite parent, Callbacks callbacks) {
         browser = createBrowser(parent);
@@ -48,15 +50,19 @@ final class ChatBrowserBridge {
         function("aichatInsertSql", callbacks::insertSql);
         function("aichatOpenSql", callbacks::openSql);
         function("aichatCopy", callbacks::copy);
+        function("aichatOpenLink", ChatBrowserBridge::openLink);
         browser.addProgressListener(ProgressListener.completedAdapter(e -> {
+            pageLoaded = true;
             ready = true;
             for (String script : pending) {
                 browser.execute(script);
             }
             pending.clear();
         }));
+        // Only the initial setText load may navigate; anything later (even about:blank from a
+        // sanitized link) would reload an empty page and lose the conversation and approvals.
         browser.addLocationListener(LocationListener.changingAdapter(e -> {
-            if (e.location != null && !e.location.startsWith("about:")) {
+            if (pageLoaded || (e.location != null && !e.location.startsWith("about:"))) {
                 e.doit = false;
             }
         }));
@@ -143,6 +149,12 @@ final class ChatBrowserBridge {
                 return null;
             }
         };
+    }
+
+    private static void openLink(String url) {
+        if (url.startsWith("http://") || url.startsWith("https://")) {
+            Program.launch(url);
+        }
     }
 
     private static Browser createBrowser(Composite parent) {

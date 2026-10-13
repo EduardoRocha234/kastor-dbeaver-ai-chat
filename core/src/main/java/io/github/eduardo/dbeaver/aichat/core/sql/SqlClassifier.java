@@ -37,7 +37,7 @@ public final class SqlClassifier {
         if (!READ_STARTERS.contains(first)) {
             return SqlKind.WRITE;
         }
-        if ("EXPLAIN".equals(first) && words.contains("ANALYZE")) {
+        if ("EXPLAIN".equals(first) && (words.contains("ANALYZE") || words.contains("ANALYSE"))) {
             return SqlKind.WRITE;
         }
         for (String word : words) {
@@ -65,9 +65,16 @@ public final class SqlClassifier {
         int n = sql.length();
         while (i < n) {
             char c = sql.charAt(i);
-            if (c == '-' && i + 1 < n && sql.charAt(i + 1) == '-' && (i + 2 >= n || Character.isWhitespace(sql.charAt(i + 2)))) {
+            if (c == '-' && i + 1 < n && sql.charAt(i + 1) == '-') {
+                if (i + 2 < n && !Character.isWhitespace(sql.charAt(i + 2))) {
+                    // MySQL needs whitespace after "--", other databases don't: dialects disagree.
+                    throw new IllegalArgumentException("ambiguous comment");
+                }
                 int end = sql.indexOf('\n', i);
                 i = end < 0 ? n : end + 1;
+            } else if (c == '#') {
+                // A comment in MySQL, an operator elsewhere: dialects disagree.
+                throw new IllegalArgumentException("ambiguous #");
             } else if (c == '/' && i + 1 < n && sql.charAt(i + 1) == '*') {
                 if (i + 2 < n && sql.charAt(i + 2) == '!') {
                     throw new IllegalArgumentException("executable comment");
@@ -114,10 +121,17 @@ public final class SqlClassifier {
         return statements;
     }
 
-    /** Returns the index after the closing quote; doubled quotes are escapes. Backslash is not. */
+    /**
+     * Returns the index after the closing quote; doubled quotes are escapes. A backslash is an
+     * escape in some dialects (MySQL, Postgres E'') and a plain character in others, so it is
+     * rejected rather than guessed.
+     */
     private static int skipQuoted(String sql, int start, char quote) {
         int i = start + 1;
         while (i < sql.length()) {
+            if (sql.charAt(i) == '\\') {
+                throw new IllegalArgumentException("backslash in quoted text");
+            }
             if (sql.charAt(i) == quote) {
                 if (i + 1 < sql.length() && sql.charAt(i + 1) == quote) {
                     i += 2;
