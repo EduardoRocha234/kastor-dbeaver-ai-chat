@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feature
+      id="io.github.eduardo.dbeaver.aichat.feature"
+      label="DBeaver AI Chat"
+      version="0.1.0.qualifier"
+      provider-name="Eduardo">
+
+   <description>
+      Chat de IA dentro do DBeaver com acesso às conexões configuradas.
+   </description>
+
+   <requires>
+      <import plugin="org.jkiss.dbeaver.core" version="24.1.0" match="greaterOrEqual"/>
+   </requires>
+
+   <plugin
+         id="io.github.eduardo.dbeaver.aichat"
+         version="0.0.0"
+         unpack="false"/>
+</feature>

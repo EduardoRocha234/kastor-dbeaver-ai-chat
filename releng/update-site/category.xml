@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<site>
+   <feature id="io.github.eduardo.dbeaver.aichat.feature" version="0.0.0">
+      <category name="aichat"/>
+   </feature>
+   <category-def name="aichat" label="DBeaver AI Chat"/>
+</site>

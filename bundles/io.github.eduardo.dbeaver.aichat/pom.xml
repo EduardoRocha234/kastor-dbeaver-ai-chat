@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>io.github.eduardo.dbeaver.aichat</groupId>
+    <artifactId>aichat-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../../pom.xml</relativePath>
+  </parent>
+  <artifactId>io.github.eduardo.dbeaver.aichat</artifactId>
+  <packaging>eclipse-plugin</packaging>
+
+  <dependencies>
+    <!-- Declared only so the reactor builds core first; the jar is embedded below. -->
+    <dependency>
+      <groupId>io.github.eduardo.dbeaver.aichat</groupId>
+      <artifactId>aichat-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.8.1</version>
+        <executions>
+          <execution>
+            <id>embed-libs</id>
+            <phase>initialize</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.basedir}/lib</outputDirectory>
+              <stripVersion>true</stripVersion>
+              <overWriteSnapshots>true</overWriteSnapshots>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>io.github.eduardo.dbeaver.aichat</groupId>
+                  <artifactId>aichat-core</artifactId>
+                  <version>${project.version}</version>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>org.commonmark</groupId>
+                  <artifactId>commonmark</artifactId>
+                  <version>0.24.0</version>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>org.commonmark</groupId>
+                  <artifactId>commonmark-ext-gfm-tables</artifactId>
+                  <version>0.24.0</version>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

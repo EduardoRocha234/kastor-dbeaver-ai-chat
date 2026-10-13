@@ -1,0 +1,26 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: DBeaver AI Chat
+Bundle-SymbolicName: io.github.eduardo.dbeaver.aichat;singleton:=true
+Bundle-Version: 0.1.0.qualifier
+Bundle-Vendor: Eduardo
+Bundle-Activator: io.github.eduardo.dbeaver.aichat.Activator
+Bundle-ActivationPolicy: lazy
+Bundle-RequiredExecutionEnvironment: JavaSE-17
+Automatic-Module-Name: io.github.eduardo.dbeaver.aichat
+Bundle-ClassPath: .,
+ lib/aichat-core.jar,
+ lib/commonmark.jar,
+ lib/commonmark-ext-gfm-tables.jar
+Require-Bundle: org.eclipse.core.runtime,
+ org.eclipse.core.commands,
+ org.eclipse.equinox.security,
+ org.eclipse.ui,
+ org.eclipse.jface.text,
+ org.eclipse.ui.workbench.texteditor,
+ com.google.gson,
+ org.jkiss.dbeaver.model,
+ org.jkiss.dbeaver.ui,
+ org.jkiss.dbeaver.ui.editors.base,
+ org.jkiss.dbeaver.ui.editors.sql
+
