@@ -7,12 +7,70 @@
             name="AI Chat"
             category="org.jkiss.dbeaver.core.category"
             class="io.github.eduardo.dbeaver.aichat.ui.ChatView"
+            icon="icons/chat.png"
             restorable="true"/>
    </extension>
+
+   <!-- Docked to the right of the editor area in DBeaver's default perspective, like the VS Code chat. -->
+   <extension point="org.eclipse.ui.perspectiveExtensions">
+      <perspectiveExtension targetID="org.jkiss.dbeaver.core.perspective">
+         <view
+               id="io.github.eduardo.dbeaver.aichat.view"
+               relative="org.eclipse.ui.editorss"
+               relationship="right"
+               ratio="0.70"
+               visible="true"/>
+         <viewShortcut id="io.github.eduardo.dbeaver.aichat.view"/>
+      </perspectiveExtension>
+   </extension>
+
    <extension point="org.eclipse.ui.preferencePages">
       <page
             id="io.github.eduardo.dbeaver.aichat.preferences"
             name="AI Chat"
             class="io.github.eduardo.dbeaver.aichat.settings.AiChatPreferencePage"/>
+   </extension>
+
+   <extension point="org.eclipse.ui.commands">
+      <command
+            id="io.github.eduardo.dbeaver.aichat.openChat"
+            name="AI Chat"
+            description="Abrir o painel de chat de IA"/>
+      <command
+            id="io.github.eduardo.dbeaver.aichat.askAboutSelection"
+            name="Perguntar à IA sobre a seleção"/>
+   </extension>
+
+   <extension point="org.eclipse.ui.commandImages">
+      <image commandId="io.github.eduardo.dbeaver.aichat.openChat" icon="icons/chat.png"/>
+      <image commandId="io.github.eduardo.dbeaver.aichat.askAboutSelection" icon="icons/chat.png"/>
+   </extension>
+
+   <extension point="org.eclipse.ui.handlers">
+      <handler
+            commandId="io.github.eduardo.dbeaver.aichat.openChat"
+            class="io.github.eduardo.dbeaver.aichat.ui.OpenChatHandler"/>
+      <handler
+            commandId="io.github.eduardo.dbeaver.aichat.askAboutSelection"
+            class="io.github.eduardo.dbeaver.aichat.ui.AskAiHandler"/>
+   </extension>
+
+   <extension point="org.eclipse.ui.menus">
+      <!-- Quick-open button in the main toolbar (standard Eclipse location, stable across DBeaver versions). -->
+      <menuContribution locationURI="toolbar:org.eclipse.ui.main.toolbar?after=additions">
+         <toolbar id="io.github.eduardo.dbeaver.aichat.toolbar" label="AI Chat">
+            <command
+                  commandId="io.github.eduardo.dbeaver.aichat.openChat"
+                  tooltip="Abrir o AI Chat"
+                  style="push"/>
+         </toolbar>
+      </menuContribution>
+      <menuContribution locationURI="menu:window?after=additions">
+         <command commandId="io.github.eduardo.dbeaver.aichat.openChat" label="AI Chat"/>
+      </menuContribution>
+      <menuContribution
+            locationURI="popup:org.jkiss.dbeaver.ui.editors.sql.SQLEditor.EditorContext?after=sql.extras">
+         <command commandId="io.github.eduardo.dbeaver.aichat.askAboutSelection"/>
+      </menuContribution>
    </extension>
 </plugin>
