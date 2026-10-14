@@ -13,6 +13,8 @@ import io.github.eduardo.dbeaver.aichat.core.history.ConversationStore;
 import io.github.eduardo.dbeaver.aichat.core.history.ConversationSummary;
 import io.github.eduardo.dbeaver.aichat.core.llm.AssistantTurn;
 import io.github.eduardo.dbeaver.aichat.core.llm.ChatMessage;
+import io.github.eduardo.dbeaver.aichat.core.llm.LlmException;
+import io.github.eduardo.dbeaver.aichat.core.llm.ModelLister;
 import io.github.eduardo.dbeaver.aichat.core.llm.ProviderConfig;
 import io.github.eduardo.dbeaver.aichat.core.llm.ProviderFactory;
 import io.github.eduardo.dbeaver.aichat.core.llm.ToolCall;
@@ -35,6 +37,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.jobs.Job;
@@ -50,6 +54,7 @@ import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.dialogs.PreferencesUtil;
 import org.eclipse.ui.part.ViewPart;
 import org.jkiss.dbeaver.Log;
+import org.osgi.service.prefs.BackingStoreException;
 import org.jkiss.dbeaver.model.DBPDataSourceContainer;
 import org.osgi.framework.Version;
 
@@ -69,6 +74,9 @@ public class ChatView extends ViewPart {
     private ConversationStore store;
     private Conversation conversation = Conversation.create();
     private List<ProviderConfig> providers = List.of();
+    /** Models served by each provider (key = provider id + base URL), fetched once in the background. */
+    private final Map<String, List<String>> modelCache = new ConcurrentHashMap<>();
+    private final Set<String> modelFetches = ConcurrentHashMap.newKeySet();
     private List<ConnectionInfo> connections = List.of();
     private CancellationToken running;
     /** Connection picked in the header; null = the active editor's connection. */
@@ -164,17 +172,68 @@ public class ChatView extends ViewPart {
         return getSite().getWorkbenchWindow();
     }
 
+    /** Picker entries are "providerId|model": every model a provider serves, or just the configured one until fetched. */
     private void refreshProviders() {
         providers = ProviderSettings.loadProviders();
+        ProviderConfig selected = selectedProvider();
         JsonArray entries = new JsonArray();
         if (providers.isEmpty()) {
             entries.add(entry("", "(configure um provedor)"));
         }
         for (ProviderConfig p : providers) {
-            entries.add(entry(p.id(), p.name() + " — " + p.model()));
+            fetchModels(p);
+            List<String> models = new ArrayList<>(modelCache.getOrDefault(modelKey(p), List.of()));
+            if (!models.contains(p.model())) {
+                models.add(0, p.model());
+            }
+            for (String m : models) {
+                entries.add(entry(p.id() + "|" + m, p.name() + " — " + m));
+            }
         }
-        ProviderConfig selected = selectedProvider();
-        bridge.setProviders(entries, selected == null ? "" : selected.id());
+        bridge.setProviders(entries, selected == null ? "" : selected.id() + "|" + selected.model());
+    }
+
+    private static String modelKey(ProviderConfig p) {
+        return p.id() + "|" + p.baseUrl();
+    }
+
+    private void fetchModels(ProviderConfig p) {
+        String key = modelKey(p);
+        if (modelCache.containsKey(key) || !modelFetches.add(key)) {
+            return;
+        }
+        String apiKey = ProviderSettings.apiKey(p.id());
+        Job.create("Kastor: listar modelos", monitor -> {
+            try {
+                modelCache.put(key, ModelLister.list(p, apiKey, http));
+                display.asyncExec(() -> {
+                    if (!bridge.isDisposed()) {
+                        refreshProviders();
+                    }
+                });
+            } catch (LlmException e) {
+                log.warn("Could not list models of " + p.name() + ": " + e.getMessage());
+            }
+        }).schedule();
+    }
+
+    /** The picked model becomes the provider's configured model. */
+    private void useModel(String providerId, String model) {
+        List<ProviderConfig> all = ProviderSettings.loadProviders();
+        for (int i = 0; i < all.size(); i++) {
+            ProviderConfig p = all.get(i);
+            if (p.id().equals(providerId) && !p.model().equals(model)) {
+                all.set(i, new ProviderConfig(p.id(), p.name(), p.type(), p.baseUrl(), model, p.maxTokens(),
+                        p.temperature(), p.serverFallback()));
+                try {
+                    ProviderSettings.saveProviders(all);
+                } catch (BackingStoreException e) {
+                    log.error("Could not save selected model", e);
+                }
+                refreshProviders();
+                return;
+            }
+        }
     }
 
     private ProviderConfig selectedProvider() {
@@ -495,7 +554,13 @@ public class ChatView extends ViewPart {
             if (id.isEmpty()) {
                 openPreferences();
             } else {
-                ProviderSettings.setActiveProviderId(id);
+                int sep = id.indexOf('|');
+                String providerId = sep < 0 ? id : id.substring(0, sep);
+                String model = sep < 0 ? null : id.substring(sep + 1);
+                ProviderSettings.setActiveProviderId(providerId);
+                if (model != null) {
+                    useModel(providerId, model);
+                }
             }
         }
 

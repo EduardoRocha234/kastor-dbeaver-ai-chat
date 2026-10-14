@@ -76,6 +76,30 @@ public final class HttpStreaming {
         return response.body();
     }
 
+    /** GET returning the whole body as text; throws on non-2xx. */
+    public static String get(HttpClient http, URI uri, Map<String, String> headers) throws LlmException {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
+                .timeout(Duration.ofSeconds(20))
+                .header("Accept", "application/json")
+                .GET();
+        headers.forEach(builder::header);
+        HttpResponse<String> response;
+        try {
+            response = http.send(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new LlmException("Interrompido ao conectar em " + uri, 0);
+        } catch (IOException e) {
+            throw new LlmException("Falha ao conectar em " + uri + ": " + e, 0);
+        }
+        if (response.statusCode() / 100 != 2) {
+            String body = response.body();
+            throw new LlmException("HTTP " + response.statusCode() + " de " + uri + ": "
+                    + (body.length() > 500 ? body.substring(0, 500) : body), response.statusCode());
+        }
+        return response.body();
+    }
+
     public static void closeQuietly(InputStream in) {
         try {
             in.close();
