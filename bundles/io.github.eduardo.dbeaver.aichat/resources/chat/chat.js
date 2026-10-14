@@ -7,6 +7,9 @@
   var stopBtn = document.getElementById('stop');
   var menu = document.getElementById('mention-menu');
   var running = false;
+  var sent = [];
+  var histIdx = -1;
+  var draft = '';
 
   function el(tag, cls, text) {
     var e = document.createElement(tag);
@@ -138,6 +141,15 @@
   /** Send only makes sense with something typed. */
   function updateSend() { sendBtn.disabled = !input.value.trim(); }
 
+  /** Programmatic fill (history recall); cursor goes to the end. */
+  function setInput(value) {
+    input.value = value;
+    input.setSelectionRange(value.length, value.length);
+    autosize();
+    updateSend();
+    hideMenu();
+  }
+
   function submit() {
     if (running || !input.value.trim()) { return; }
     hideMenu();
@@ -162,12 +174,39 @@
         return;
       }
     }
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.isComposing
+        && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey
+        && input.selectionStart === input.selectionEnd) {
+      var pos = input.selectionStart;
+      if (e.key === 'ArrowUp' && sent.length > 0 && input.value.lastIndexOf('\n', pos - 1) === -1) {
+        e.preventDefault();
+        if (histIdx === -1) {
+          draft = input.value;
+          histIdx = sent.length - 1;
+        } else {
+          histIdx = Math.max(0, histIdx - 1);
+        }
+        setInput(sent[histIdx]);
+        return;
+      }
+      if (e.key === 'ArrowDown' && histIdx !== -1 && input.value.indexOf('\n', pos) === -1) {
+        e.preventDefault();
+        histIdx++;
+        if (histIdx >= sent.length) {
+          histIdx = -1;
+          setInput(draft);
+        } else {
+          setInput(sent[histIdx]);
+        }
+        return;
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       submit();
     }
   });
-  input.addEventListener('input', function () { autosize(); updateSend(); updateMention(); });
+  input.addEventListener('input', function () { histIdx = -1; autosize(); updateSend(); updateMention(); });
   input.addEventListener('click', updateMention);
   input.addEventListener('keyup', function (e) {
     if (/^(ArrowLeft|ArrowRight|Home|End)$/.test(e.key)) { updateMention(); }
@@ -516,8 +555,13 @@
     clear: function () {
       list.innerHTML = '';
       document.body.classList.remove('started');
+      sent = [];
+      histIdx = -1;
+      draft = '';
     },
     addUser: function (text) {
+      sent.push(text);
+      histIdx = -1;
       var row = el('div', 'row user');
       var bubble = el('div', 'bubble');
       bubble.appendChild(userText(text));
@@ -619,7 +663,7 @@
       sendBtn.hidden = running;
       stopBtn.hidden = !running;
     },
-    clearInput: function () { input.value = ''; autosize(); updateSend(); hideMenu(); },
+    clearInput: function () { histIdx = -1; draft = ''; input.value = ''; autosize(); updateSend(); hideMenu(); },
     /** Prefills the composer unless the user already typed a draft there. */
     setInput: function (text, selectAll) {
       if (input.value.trim()) { input.focus(); return; }
