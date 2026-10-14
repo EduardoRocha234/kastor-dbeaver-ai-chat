@@ -2,7 +2,7 @@
 <feature
       id="io.github.eduardo.dbeaver.aichat.feature"
       label="Kastor - DBeaver AI Chat"
-      version="0.1.0.qualifier"
+      version="0.1.1.qualifier"
       provider-name="Eduardo">
 
    <description>
