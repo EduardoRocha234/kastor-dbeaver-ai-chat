@@ -24,6 +24,8 @@ final class FakeGateway implements DatabaseGateway {
             List.of(new IndexInfo("idx_orders_customer", false, List.of("customer_id"))));
     QueryResult queryResult = new QueryResult(List.of("id", "name"),
             List.of(List.of("1", "Ana"), Arrays.asList("2", null)), false);
+    TypedResult typedResult = new TypedResult(List.of("id", "name"),
+            List.of(List.of(1, "Ana"), Arrays.asList(2, null)), false);
     Optional<SqlKind> nativeKind = Optional.empty();
     GatewayException failure;
     long updateCount = 3;
@@ -74,6 +76,19 @@ final class FakeGateway implements DatabaseGateway {
         lastMaxRows = maxRows;
         reads.add(sql);
         return queryResult;
+    }
+
+    @Override
+    public TypedResult runTypedReadQuery(String connectionId, String schema, String sql, int maxRows,
+            CancellationToken cancel) throws GatewayException {
+        lastConnectionId = connectionId;
+        lastSchema = schema;
+        lastMaxRows = maxRows;
+        reads.add(sql);
+        if (failure != null) {
+            throw failure;
+        }
+        return typedResult;
     }
 
     @Override

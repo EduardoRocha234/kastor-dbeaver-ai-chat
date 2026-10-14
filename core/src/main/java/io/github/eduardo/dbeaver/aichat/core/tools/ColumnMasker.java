@@ -88,4 +88,31 @@ public final class ColumnMasker {
         }
         return new QueryResult(result.columns(), rows, result.truncated());
     }
+
+    /** Typed counterpart of {@link #apply(QueryResult)}: masked cells become the text {@link #MASK}. */
+    public TypedResult apply(TypedResult result) {
+        if (patterns.isEmpty()) {
+            return result;
+        }
+        boolean[] masked = new boolean[result.columns().size()];
+        boolean any = false;
+        for (int i = 0; i < masked.length; i++) {
+            masked[i] = matches(result.columns().get(i));
+            any |= masked[i];
+        }
+        if (!any) {
+            return result;
+        }
+        List<List<Object>> rows = new ArrayList<>(result.rows().size());
+        for (List<Object> row : result.rows()) {
+            List<Object> copy = new ArrayList<>(row);
+            for (int i = 0; i < copy.size() && i < masked.length; i++) {
+                if (masked[i] && copy.get(i) != null) {
+                    copy.set(i, MASK);
+                }
+            }
+            rows.add(copy);
+        }
+        return new TypedResult(result.columns(), rows, result.truncated());
+    }
 }

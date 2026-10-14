@@ -27,7 +27,8 @@ public final class ToolRegistry {
                 new ListTablesTool(gateway),
                 new DescribeTableTool(gateway),
                 new RunQueryTool(gateway),
-                new ExecuteWriteTool(gateway)));
+                new ExecuteWriteTool(gateway),
+                new GenerateFileTool(gateway)));
     }
 
     public List<ToolSpec> specs() {

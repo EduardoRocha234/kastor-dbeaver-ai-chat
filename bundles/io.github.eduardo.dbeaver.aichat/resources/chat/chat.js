@@ -632,6 +632,21 @@
       var box = byId('approval-' + id);
       if (box) { settle(box, label); }
     },
+    addFileCard: function (path, name, format, details) {
+      var card = el('div', 'file-card');
+      card.appendChild(el('div', 'file-icon ' + format, format.toUpperCase()));
+      var info = el('div', 'file-info');
+      info.appendChild(el('div', 'file-name', name));
+      info.appendChild(el('div', 'file-details', details));
+      card.appendChild(info);
+      var actions = el('div', 'actions');
+      actions.appendChild(button('Abrir', function () { aichatOpenFile(path); }, 'primary'));
+      actions.appendChild(button('Abrir pasta', function () { aichatRevealFile(path); }));
+      actions.appendChild(button('Salvar como…', function () { aichatSaveFileAs(path); }));
+      card.appendChild(actions);
+      card.title = path;
+      append(card);
+    },
     addNotice: function (text) { append(el('div', 'notice', text)); },
     addLimitNotice: function (text) {
       var n = el('div', 'notice', text);

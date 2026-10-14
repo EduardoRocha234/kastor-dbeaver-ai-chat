@@ -11,7 +11,10 @@ Automatic-Module-Name: io.github.eduardo.dbeaver.aichat
 Bundle-ClassPath: .,
  lib/aichat-core.jar,
  lib/commonmark.jar,
- lib/commonmark-ext-gfm-tables.jar
+ lib/commonmark-ext-gfm-tables.jar,
+ lib/fastexcel.jar,
+ lib/opczip.jar,
+ lib/openpdf.jar
 Require-Bundle: org.eclipse.core.runtime,
  org.eclipse.core.commands,
  org.eclipse.equinox.security,

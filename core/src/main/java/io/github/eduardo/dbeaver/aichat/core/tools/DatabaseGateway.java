@@ -31,6 +31,13 @@ public interface DatabaseGateway {
     QueryResult runReadQuery(String connectionId, String schema, String sql, int maxRows, CancellationToken cancel)
             throws GatewayException;
 
+    /**
+     * Same as runReadQuery, but values keep their type (see {@link TypedResult}); used to write files, so maxRows
+     * is the export limit rather than what fits in the model's context.
+     */
+    TypedResult runTypedReadQuery(String connectionId, String schema, String sql, int maxRows,
+            CancellationToken cancel) throws GatewayException;
+
     /** Runs an approved write statement and commits; returns affected rows (-1 if unknown). schema as in runReadQuery. */
     long executeUpdate(String connectionId, String schema, String sql, CancellationToken cancel) throws GatewayException;
 

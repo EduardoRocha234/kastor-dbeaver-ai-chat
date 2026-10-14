@@ -8,9 +8,12 @@ import io.github.eduardo.dbeaver.aichat.core.llm.ProviderConfig;
 import io.github.eduardo.dbeaver.aichat.core.audit.AuditLog;
 import io.github.eduardo.dbeaver.aichat.core.audit.JsonlAuditLog;
 import io.github.eduardo.dbeaver.aichat.core.tools.ColumnMasker;
+import io.github.eduardo.dbeaver.aichat.core.tools.ExportSettings;
 import io.github.eduardo.dbeaver.aichat.core.tools.ToolLimits;
 import io.github.eduardo.dbeaver.aichat.core.tools.ToolPolicy;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import org.eclipse.core.runtime.preferences.IEclipsePreferences;
@@ -37,6 +40,8 @@ public final class ProviderSettings {
     private static final String KEY_UPDATE_CHECK = "updateCheckEnabled";
     private static final String KEY_LAST_UPDATE_CHECK = "lastUpdateCheck";
     private static final String KEY_DISMISSED_VERSION = "dismissedVersion";
+    private static final String KEY_EXPORT_DIR = "exportDirectory";
+    private static final String KEY_EXPORT_MAX_ROWS = "exportMaxRows";
     private static final String SECURE_NODE = Activator.PLUGIN_ID + "/apiKeys";
 
     private ProviderSettings() {
@@ -126,6 +131,32 @@ public final class ProviderSettings {
         p.putInt(KEY_MAX_ROWS, limits.maxRows());
         p.putInt(KEY_MAX_CHARS, limits.maxResultChars());
         p.putInt(KEY_MAX_ITERATIONS, maxIterations);
+        p.flush();
+    }
+
+    public static Path defaultExportDirectory() {
+        return Paths.get(System.getProperty("user.home"), "Kastor", "exports");
+    }
+
+    /** Where generate_file writes; created on first use. */
+    public static Path exportDirectory() {
+        String dir = prefs().get(KEY_EXPORT_DIR, "");
+        return dir.isBlank() ? defaultExportDirectory() : Paths.get(dir);
+    }
+
+    public static int exportMaxRows() {
+        return prefs().getInt(KEY_EXPORT_MAX_ROWS, ExportSettings.DEFAULT_MAX_ROWS);
+    }
+
+    public static void saveExport(String directory, int maxRows) throws BackingStoreException {
+        IEclipsePreferences p = prefs();
+        String dir = directory == null ? "" : directory.trim();
+        if (dir.isEmpty() || Paths.get(dir).equals(defaultExportDirectory())) {
+            p.remove(KEY_EXPORT_DIR);
+        } else {
+            p.put(KEY_EXPORT_DIR, dir);
+        }
+        p.putInt(KEY_EXPORT_MAX_ROWS, maxRows);
         p.flush();
     }
 

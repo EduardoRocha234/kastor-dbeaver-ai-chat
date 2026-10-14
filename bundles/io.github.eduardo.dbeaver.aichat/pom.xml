@@ -54,6 +54,22 @@
                   <artifactId>commonmark-ext-gfm-tables</artifactId>
                   <version>0.24.0</version>
                 </artifactItem>
+                <!-- File export (generate_file); versions match core/pom.xml. -->
+                <artifactItem>
+                  <groupId>org.dhatim</groupId>
+                  <artifactId>fastexcel</artifactId>
+                  <version>0.20.2</version>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>com.github.rzymek</groupId>
+                  <artifactId>opczip</artifactId>
+                  <version>1.2.0</version>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>com.github.librepdf</groupId>
+                  <artifactId>openpdf</artifactId>
+                  <version>2.0.5</version>
+                </artifactItem>
               </artifactItems>
             </configuration>
           </execution>

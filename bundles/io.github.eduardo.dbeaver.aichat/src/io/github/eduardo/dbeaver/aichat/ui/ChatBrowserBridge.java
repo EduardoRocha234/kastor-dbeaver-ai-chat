@@ -75,6 +75,13 @@ final class ChatBrowserBridge {
         void openSettings();
 
         void dismissUpdate(String version);
+
+        /** Buttons of a generated-file card; path comes from the page, so it must be checked. */
+        void openFile(String path);
+
+        void revealFile(String path);
+
+        void saveFileAs(String path);
     }
 
     private static final Log log = Log.getLog(ChatBrowserBridge.class);
@@ -124,6 +131,9 @@ final class ChatBrowserBridge {
         function("aichatDeleteConversation", callbacks::deleteConversation);
         function("aichatOpenSettings", arg -> callbacks.openSettings());
         function("aichatDismissUpdate", callbacks::dismissUpdate);
+        function("aichatOpenFile", callbacks::openFile);
+        function("aichatRevealFile", callbacks::revealFile);
+        function("aichatSaveFileAs", callbacks::saveFileAs);
         function("aichatMention", arg -> {
             JsonObject request = Json.parseObject(arg);
             callbacks.mention(request.get("seq").getAsInt(), request.get("query").getAsString());
@@ -232,6 +242,11 @@ final class ChatBrowserBridge {
 
     void addNotice(String text) {
         call("addNotice", text);
+    }
+
+    /** A file written by generate_file, with buttons to open it, show its folder or save a copy. */
+    void addFileCard(String path, String name, String format, String details) {
+        call("addFileCard", path, name, format, details);
     }
 
     void addLimitNotice(String text) {

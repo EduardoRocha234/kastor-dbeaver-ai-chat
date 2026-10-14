@@ -13,6 +13,10 @@ import io.github.eduardo.dbeaver.aichat.core.tools.IndexInfo;
 import io.github.eduardo.dbeaver.aichat.core.tools.QueryResult;
 import io.github.eduardo.dbeaver.aichat.core.tools.TableDescription;
 import io.github.eduardo.dbeaver.aichat.core.tools.TableInfo;
+import io.github.eduardo.dbeaver.aichat.core.tools.TypedResult;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -20,6 +24,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import org.jkiss.dbeaver.DBException;
 import org.jkiss.dbeaver.Log;
 import org.jkiss.dbeaver.model.DBPDataSource;
@@ -58,6 +63,10 @@ public final class DBeaverGateway implements DatabaseGateway {
 
     private static final Log log = Log.getLog(DBeaverGateway.class);
     private static final int QUERY_TIMEOUT_SECONDS = 60;
+    /** Exports read every row, so they get more time than interactive queries. */
+    private static final int EXPORT_TIMEOUT_SECONDS = 600;
+    /** Excel's limit for one cell. */
+    private static final int MAX_EXPORT_CELL_CHARS = 32_767;
     private static final int MAX_CELL_CHARS = 2000;
 
     /** isolated = auto-commit was disabled on a context owned by this gateway. */
@@ -254,6 +263,32 @@ public final class DBeaverGateway implements DatabaseGateway {
     @Override
     public QueryResult runReadQuery(String connectionId, String schema, String sql, int maxRows,
             CancellationToken cancel) throws GatewayException {
+        Rows<String> rows = read(connectionId, schema, sql, maxRows, QUERY_TIMEOUT_SECONDS, cancel,
+                DBeaverGateway::cell);
+        if (rows == null) {
+            return new QueryResult(List.of("resultado"),
+                    List.of(List.of("Comando executado sem conjunto de resultados.")), false);
+        }
+        return new QueryResult(rows.columns(), rows.rows(), rows.truncated());
+    }
+
+    @Override
+    public TypedResult runTypedReadQuery(String connectionId, String schema, String sql, int maxRows,
+            CancellationToken cancel) throws GatewayException {
+        Rows<Object> rows = read(connectionId, schema, sql, maxRows, EXPORT_TIMEOUT_SECONDS, cancel,
+                DBeaverGateway::typedCell);
+        if (rows == null) {
+            throw new GatewayException("O comando não retornou um conjunto de resultados.", null);
+        }
+        return new TypedResult(rows.columns(), rows.rows(), rows.truncated());
+    }
+
+    private record Rows<T>(List<String> columns, List<List<T>> rows, boolean truncated) {
+    }
+
+    /** Runs a read in our own read-only transaction, always rolled back. null = the statement returned no result set. */
+    private <T> Rows<T> read(String connectionId, String schema, String sql, int maxRows, int timeoutSeconds,
+            CancellationToken cancel, Function<Object, T> convert) throws GatewayException {
         ContextHandle handle = context(connectionId, schema);
         if (!handle.isolated()) {
             // Without our own transaction a read can't be rolled back and would run in the
@@ -268,30 +303,30 @@ public final class DBeaverGateway implements DatabaseGateway {
             try (DBCStatement statement = session.prepareStatement(DBCStatementType.QUERY, sql, false, false, false);
                     CancellationToken.Registration registration = cancel.onCancel(() -> cancelQuietly(statement, monitor))) {
                 statement.setLimit(0, maxRows + 1L);
-                statement.setStatementTimeout(QUERY_TIMEOUT_SECONDS);
+                statement.setStatementTimeout(timeoutSeconds);
                 if (!statement.executeStatement()) {
-                    return new QueryResult(List.of("resultado"),
-                            List.of(List.of("Comando executado sem conjunto de resultados.")), false);
+                    return null;
                 }
                 try (DBCResultSet rs = statement.openResultSet()) {
                     List<String> columns = new ArrayList<>();
                     for (DBCAttributeMetaData attribute : rs.getMeta().getAttributes()) {
                         columns.add(attribute.getLabel());
                     }
-                    List<List<String>> rows = new ArrayList<>();
+                    List<List<T>> rows = new ArrayList<>();
                     boolean truncated = false;
                     while (rs.nextRow()) {
+                        cancel.throwIfCancelled();
                         if (rows.size() >= maxRows) {
                             truncated = true;
                             break;
                         }
-                        List<String> row = new ArrayList<>(columns.size());
+                        List<T> row = new ArrayList<>(columns.size());
                         for (int i = 0; i < columns.size(); i++) {
-                            row.add(cell(rs.getAttributeValue(i)));
+                            row.add(convert.apply(rs.getAttributeValue(i)));
                         }
                         rows.add(row);
                     }
-                    return new QueryResult(columns, rows, truncated);
+                    return new Rows<>(columns, rows, truncated);
                 }
             } finally {
                 if (txn != null) {
@@ -517,6 +552,31 @@ public final class DBeaverGateway implements DatabaseGateway {
         }
         String s = String.valueOf(value);
         return s.length() > MAX_CELL_CHARS ? s.substring(0, MAX_CELL_CHARS) + "…" : s;
+    }
+
+    /** Keeps numbers, booleans and dates typed for spreadsheets; everything else becomes text. */
+    private static Object typedCell(Object value) {
+        if (value == null || value instanceof Number || value instanceof Boolean || value instanceof LocalDate
+                || value instanceof LocalDateTime) {
+            return value;
+        }
+        if (value instanceof java.sql.Timestamp t) {
+            return t.toLocalDateTime();
+        }
+        if (value instanceof java.sql.Date d) {
+            return d.toLocalDate();
+        }
+        if (value instanceof java.sql.Time t) {
+            return t.toLocalTime().toString();
+        }
+        if (value instanceof java.util.Date d) {
+            return LocalDateTime.ofInstant(d.toInstant(), ZoneId.systemDefault());
+        }
+        if (value instanceof byte[] bytes) {
+            return "<binário " + bytes.length + " bytes>";
+        }
+        String s = String.valueOf(value);
+        return s.length() > MAX_EXPORT_CELL_CHARS ? s.substring(0, MAX_EXPORT_CELL_CHARS) : s;
     }
 
     private static void cancelQuietly(DBCStatement statement, DBRProgressMonitor monitor) {

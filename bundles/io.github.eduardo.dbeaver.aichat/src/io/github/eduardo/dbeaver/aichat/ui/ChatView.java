@@ -23,6 +23,8 @@ import io.github.eduardo.dbeaver.aichat.core.mention.Mention;
 import io.github.eduardo.dbeaver.aichat.core.mention.Mentions;
 import io.github.eduardo.dbeaver.aichat.core.tools.ConnectionInfo;
 import io.github.eduardo.dbeaver.aichat.core.tools.Decision;
+import io.github.eduardo.dbeaver.aichat.core.tools.ExportSettings;
+import io.github.eduardo.dbeaver.aichat.core.tools.GeneratedFile;
 import io.github.eduardo.dbeaver.aichat.core.tools.ToolContext;
 import io.github.eduardo.dbeaver.aichat.core.tools.ToolOutcome;
 import io.github.eduardo.dbeaver.aichat.core.tools.ToolRegistry;
@@ -34,9 +36,14 @@ import io.github.eduardo.dbeaver.aichat.settings.AiChatPreferencePage;
 import io.github.eduardo.dbeaver.aichat.settings.ProviderSettings;
 import java.io.IOException;
 import java.net.http.HttpClient;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -45,13 +52,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.jface.dialogs.MessageDialog;
+import org.eclipse.swt.SWT;
 import org.eclipse.swt.dnd.Clipboard;
 import org.eclipse.swt.dnd.TextTransfer;
 import org.eclipse.swt.dnd.Transfer;
 import org.eclipse.swt.graphics.RGB;
 import org.eclipse.swt.layout.FillLayout;
+import org.eclipse.swt.program.Program;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.FileDialog;
 import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.dialogs.PreferencesUtil;
 import org.eclipse.ui.part.ViewPart;
@@ -365,9 +375,10 @@ public class ChatView extends ViewPart {
         ChatSession session = new ChatSession(current,
                 ProviderFactory.create(config, ProviderSettings.apiKey(config.id()), http),
                 config, tools, ProviderSettings.sessionSettings());
-        ToolContext toolContext = new ToolContext(connectionId, approvalGate, token, ProviderSettings.toolLimits(),
-                ProviderSettings.toolPolicy());
         UiListener listener = new UiListener(token, current);
+        ToolContext toolContext = new ToolContext(connectionId, approvalGate, token, ProviderSettings.toolLimits(),
+                ProviderSettings.toolPolicy(), new ExportSettings(ProviderSettings.exportDirectory(),
+                        ProviderSettings.exportMaxRows(), listener::fileGenerated));
         Job job = Job.create("Kastor", monitor -> {
             String systemPrompt = SystemPromptBuilder.build(new PromptContext(connection, dialect, editorSchema,
                     editorSql, maxRows, referencedObjects(text, knownSchemas)));
@@ -518,6 +529,19 @@ public class ChatView extends ViewPart {
         return text.length() > MAX_TOOL_RESULT_CHARS ? text.substring(0, MAX_TOOL_RESULT_CHARS) + "\n…" : text;
     }
 
+    private static String size(long bytes) {
+        if (bytes < 0) {
+            return "?";
+        }
+        if (bytes < 1024) {
+            return bytes + " B";
+        }
+        if (bytes < 1024 * 1024) {
+            return (bytes + 512) / 1024 + " KB";
+        }
+        return String.format(Locale.ROOT, "%.1f MB", bytes / (1024.0 * 1024.0));
+    }
+
     private void ui(Runnable r) {
         if (display.isDisposed()) {
             return;
@@ -637,6 +661,64 @@ public class ChatView extends ViewPart {
             ProviderSettings.saveUpdateState(ProviderSettings.lastUpdateCheck(), version);
             bridge.hideUpdate();
         }
+
+        @Override
+        public void openFile(String path) {
+            Path file = exportedFile(path);
+            if (file != null && !Program.launch(file.toString())) {
+                MessageDialog.openInformation(getSite().getShell(), "Kastor",
+                        "Nenhum programa associado a este tipo de arquivo. Ele está em:\n" + file);
+            }
+        }
+
+        @Override
+        public void revealFile(String path) {
+            Path file = exportedFile(path);
+            if (file != null) {
+                Program.launch(file.getParent().toString());
+            }
+        }
+
+        @Override
+        public void saveFileAs(String path) {
+            Path file = exportedFile(path);
+            if (file == null) {
+                return;
+            }
+            String name = file.getFileName().toString();
+            FileDialog dialog = new FileDialog(getSite().getShell(), SWT.SAVE);
+            dialog.setFileName(name);
+            dialog.setOverwrite(true);
+            int dot = name.lastIndexOf('.');
+            if (dot > 0) {
+                dialog.setFilterExtensions(new String[] {"*" + name.substring(dot), "*.*"});
+            }
+            String target = dialog.open();
+            if (target == null) {
+                return;
+            }
+            try {
+                Files.copy(file, Paths.get(target), StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException | RuntimeException e) {
+                MessageDialog.openError(getSite().getShell(), "Kastor", "Não foi possível salvar: " + e.getMessage());
+            }
+        }
+
+        /** The page is not trusted: only existing files inside the export folder are accepted. */
+        private Path exportedFile(String path) {
+            try {
+                Path dir = ProviderSettings.exportDirectory().toAbsolutePath().normalize();
+                Path file = Paths.get(path).toAbsolutePath().normalize();
+                if (file.startsWith(dir) && Files.isRegularFile(file)) {
+                    return file;
+                }
+            } catch (RuntimeException e) {
+                // invalid path: same message as a missing file
+            }
+            MessageDialog.openInformation(getSite().getShell(), "Kastor",
+                    "O arquivo não está mais na pasta de exportação (foi movido, apagado ou a pasta mudou).");
+            return null;
+        }
     }
 
     /** Receives session events on the worker thread and forwards them to the UI thread. */
@@ -736,6 +818,14 @@ public class ChatView extends ViewPart {
                 dropPendingBubble();
                 bridge.addLimitNotice("Limite de " + max + " chamadas ao modelo atingido nesta pergunta.");
             });
+        }
+
+        /** Called by generate_file on the worker thread. */
+        void fileGenerated(GeneratedFile file) {
+            String details = file.format().toUpperCase(Locale.ROOT) + " · " + size(file.sizeBytes()) + " · "
+                    + file.rows() + (file.rows() == 1 ? " linha" : " linhas");
+            ui(() -> bridge.addFileCard(file.path().toString(), file.path().getFileName().toString(), file.format(),
+                    details));
         }
 
         @Override

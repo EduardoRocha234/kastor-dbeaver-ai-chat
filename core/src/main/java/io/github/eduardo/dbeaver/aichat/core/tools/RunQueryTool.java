@@ -2,8 +2,6 @@ package io.github.eduardo.dbeaver.aichat.core.tools;
 
 import com.google.gson.JsonObject;
 import io.github.eduardo.dbeaver.aichat.core.Json;
-import io.github.eduardo.dbeaver.aichat.core.sql.SqlClassifier;
-import io.github.eduardo.dbeaver.aichat.core.sql.SqlClassifier.SqlKind;
 
 final class RunQueryTool implements DbTool {
 
@@ -39,8 +37,7 @@ final class RunQueryTool implements DbTool {
     public ToolOutcome execute(JsonObject args, ToolContext ctx) throws ToolException, GatewayException {
         ConnectionInfo conn = ConnectionResolver.resolve(gateway, Args.optString(args, "connection"), ctx.defaultConnectionId());
         String sql = Args.requireString(args, "sql");
-        boolean read = SqlClassifier.classify(sql) == SqlKind.READ
-                && gateway.classifyNative(conn.id(), sql).orElse(SqlKind.READ) == SqlKind.READ;
+        boolean read = ReadSqlGuard.isRead(gateway, conn.id(), sql);
         ToolPolicy policy = ctx.policy();
         String schema = Args.optString(args, "schema");
         if (!read) {

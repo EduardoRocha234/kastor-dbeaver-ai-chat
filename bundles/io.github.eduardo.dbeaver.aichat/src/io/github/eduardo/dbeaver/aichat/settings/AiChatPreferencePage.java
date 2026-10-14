@@ -10,6 +10,7 @@ import io.github.eduardo.dbeaver.aichat.core.llm.LlmException;
 import io.github.eduardo.dbeaver.aichat.core.llm.ProviderConfig;
 import io.github.eduardo.dbeaver.aichat.core.llm.ProviderFactory;
 import io.github.eduardo.dbeaver.aichat.core.llm.ProviderType;
+import io.github.eduardo.dbeaver.aichat.core.tools.ExportSettings;
 import io.github.eduardo.dbeaver.aichat.core.tools.ToolLimits;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
@@ -35,6 +36,7 @@ import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
+import org.eclipse.swt.widgets.DirectoryDialog;
 import org.eclipse.swt.widgets.Group;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Spinner;
@@ -60,6 +62,8 @@ public class AiChatPreferencePage extends PreferencePage implements IWorkbenchPr
     private Button allowWrites;
     private Text maskColumns;
     private Button audit;
+    private Text exportDir;
+    private Spinner exportMaxRows;
     private Button updateCheck;
 
     @Override
@@ -112,6 +116,7 @@ public class AiChatPreferencePage extends PreferencePage implements IWorkbenchPr
                 ProviderSettings.sessionSettings().maxIterations());
 
         createSecurityGroup(root);
+        createExportGroup(root);
 
         updateCheck = new Button(root, SWT.CHECK);
         updateCheck.setText("Verificar atualizações do Kastor automaticamente (consulta o GitHub no máximo 1x por dia)");
@@ -168,6 +173,50 @@ public class AiChatPreferencePage extends PreferencePage implements IWorkbenchPr
         path.setText("Arquivo: " + auditFile());
         path.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
         button(group, "Abrir pasta", this::openAuditFolder);
+    }
+
+    private void createExportGroup(Composite root) {
+        Group group = new Group(root, SWT.NONE);
+        group.setText("Arquivos gerados (planilhas, PDF, Word)");
+        group.setLayout(new GridLayout(3, false));
+        group.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
+
+        new Label(group, SWT.NONE).setText("Pasta:");
+        exportDir = new Text(group, SWT.BORDER);
+        exportDir.setText(ProviderSettings.exportDirectory().toString());
+        exportDir.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        Composite buttons = new Composite(group, SWT.NONE);
+        GridLayout buttonsLayout = new GridLayout(2, true);
+        buttonsLayout.marginWidth = 0;
+        buttonsLayout.marginHeight = 0;
+        buttons.setLayout(buttonsLayout);
+        button(buttons, "Procurar…", this::browseExportFolder);
+        button(buttons, "Abrir pasta", this::openExportFolder);
+
+        exportMaxRows = spinner(group, "Máximo de linhas por consulta exportada:", 1, 1_000_000,
+                ProviderSettings.exportMaxRows());
+        exportMaxRows.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, false, 2, 1));
+    }
+
+    private void browseExportFolder() {
+        DirectoryDialog dialog = new DirectoryDialog(getShell());
+        dialog.setFilterPath(exportDir.getText());
+        String dir = dialog.open();
+        if (dir != null) {
+            exportDir.setText(dir);
+        }
+    }
+
+    private void openExportFolder() {
+        String text = exportDir.getText().trim();
+        java.nio.file.Path dir = text.isEmpty() ? ProviderSettings.defaultExportDirectory()
+                : java.nio.file.Paths.get(text);
+        try {
+            java.nio.file.Files.createDirectories(dir);
+            Program.launch(dir.toString());
+        } catch (java.io.IOException | RuntimeException e) {
+            MessageDialog.openError(getShell(), "Kastor", "Não foi possível abrir a pasta: " + e.getMessage());
+        }
     }
 
     private static java.nio.file.Path auditFile() {
@@ -310,6 +359,8 @@ public class AiChatPreferencePage extends PreferencePage implements IWorkbenchPr
             allowWrites.setSelection(true);
         }
         maskColumns.setText("");
+        exportDir.setText(ProviderSettings.defaultExportDirectory().toString());
+        exportMaxRows.setSelection(ExportSettings.DEFAULT_MAX_ROWS);
         updateCheck.setSelection(true);
         if (audit.isEnabled()) {
             audit.setSelection(true);
@@ -332,6 +383,7 @@ public class AiChatPreferencePage extends PreferencePage implements IWorkbenchPr
                     ToolLimits.DEFAULT.maxListItems()), maxIterations.getSelection());
             ProviderSettings.saveSecurity(allowWrites.getSelection(), maskColumns.getText().trim(),
                     audit.getSelection());
+            ProviderSettings.saveExport(exportDir.getText(), exportMaxRows.getSelection());
             ProviderSettings.setUpdateCheckEnabled(updateCheck.getSelection());
             pendingKeys.clear();
             removedIds.clear();

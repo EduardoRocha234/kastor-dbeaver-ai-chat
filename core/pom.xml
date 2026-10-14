@@ -12,6 +12,9 @@
     <maven.compiler.release>17</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <commonmark.version>0.24.0</commonmark.version>
+    <fastexcel.version>0.20.2</fastexcel.version>
+    <!-- 2.0.x is the last line built for Java 17; 2.1+ needs Java 21, which DBeaver 24.1 doesn't run on. -->
+    <openpdf.version>2.0.5</openpdf.version>
   </properties>
 
   <dependencies>
@@ -30,6 +33,16 @@
       <groupId>org.commonmark</groupId>
       <artifactId>commonmark-ext-gfm-tables</artifactId>
       <version>${commonmark.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.dhatim</groupId>
+      <artifactId>fastexcel</artifactId>
+      <version>${fastexcel.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.github.librepdf</groupId>
+      <artifactId>openpdf</artifactId>
+      <version>${openpdf.version}</version>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>

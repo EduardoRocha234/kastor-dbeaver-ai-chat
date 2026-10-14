@@ -38,10 +38,10 @@ class ToolsTest {
     }
 
     @Test
-    void exposesSixTools() {
+    void exposesSevenTools() {
         List<String> names = registry.specs().stream().map(s -> s.name()).toList();
         assertEquals(List.of("list_connections", "list_schemas", "list_tables", "describe_table", "run_query",
-                "execute_write"), names);
+                "execute_write", "generate_file"), names);
         registry.specs().forEach(s -> assertEquals("object", s.inputSchema().get("type").getAsString()));
     }
 

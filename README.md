@@ -52,6 +52,8 @@ Para atualizar: **Ajuda → Check for Updates** (instalação pela URL) ou repit
 - Rodar consultas de leitura (`SELECT`, `SHOW`, `EXPLAIN`) sozinha, com limite de linhas.
 - Comandos de escrita (`INSERT`, `UPDATE`, `DELETE`, DDL) **só depois da sua aprovação** no chat.
   Conexões marcadas como somente leitura no DBeaver nunca recebem escrita.
+- Gerar arquivos com os dados do banco: planilha **XLSX** (uma aba por consulta), **CSV**, e relatórios
+  **PDF** ou **Word (DOCX)** com texto escrito pelo modelo e tabelas com os resultados.
 
 As consultas rodam num contexto de conexão separado do seu editor: leituras terminam em rollback e
 escritas aprovadas são confirmadas (commit) na hora.
@@ -112,6 +114,11 @@ Clique **Apply** e depois **Apply and Close**.
 - No editor SQL: botão direito → **Perguntar ao Kastor sobre a seleção**.
 - Blocos SQL da resposta têm os botões **Inserir no editor**, **Abrir em novo editor** e **Copiar**.
 - Conversas ficam salvas: o botão ☰ abre a lista (busca, abrir, apagar) e o + inicia uma nova.
+- Peça arquivos em linguagem natural: *"gera uma planilha com as vendas por mês de 2026"*,
+  *"relatório em PDF dos clientes inativos com uma análise"*, *"exporta os pedidos de outubro em CSV"*.
+  O arquivo aparece no chat com os botões **Abrir**, **Abrir pasta** e **Salvar como…**. Ele é gravado em
+  `~/Kastor/exports` (mude em **Preferences → Kastor → Arquivos gerados**, junto com o máximo de linhas por
+  consulta exportada, padrão 100 000). Tabelas em PDF/DOCX mostram até 5 000 linhas; para mais, use XLSX ou CSV.
 
 ## Privacidade e segurança
 
@@ -139,6 +146,11 @@ Em **Window → Preferences → Kastor → Segurança**:
 | **Permitir comandos de escrita** | Desmarcado, o modelo não consegue executar `INSERT`/`UPDATE`/`DELETE`/DDL, nem com aprovação. Leituras continuam. |
 | **Colunas mascaradas** | Lista de nomes de colunas (`cpf, *senha*, email`; `*` e `?` são curingas, sem diferenciar maiúsculas). Os valores dessas colunas viram `***` antes de ir ao modelo; `NULL` continua `NULL`. O valor padrão (`DEFAULT`) delas também é omitido em `describe_table`. |
 | **Registrar auditoria local** | Grava um arquivo `audit.jsonl` com cada consulta e comando pedido pelo modelo (veja abaixo). Ligado por padrão. |
+
+**Arquivos gerados:** o modelo escreve as consultas, mas os dados vão do banco direto para o arquivo, sem passar
+pelo provedor de IA (o modelo recebe só nome do arquivo e contagem de linhas). O texto do relatório em PDF/DOCX é
+escrito pelo modelo com o que ele já viu nas consultas normais. As mesmas regras valem: só leitura, colunas
+mascaradas viram `***` também no arquivo, e cada consulta exportada entra na auditoria como `generate_file`.
 
 Já existiam: escrita só com aprovação explícita no chat, bloqueio em conexões somente leitura do DBeaver,
 leituras em transação separada com rollback, timeout e limites de linhas/caracteres, e chave de API no
@@ -201,6 +213,10 @@ scripts/verify.sh latest          # build + testes contra a última versão
 ```
 
 O update site sai em `releng/update-site/target/kastor-dbeaver-ai-chat-v<versão>.zip`.
+
+Bibliotecas embutidas para gerar arquivos: [fastexcel](https://github.com/dhatim/fastexcel) e
+[opczip](https://github.com/rzymek/opczip) (Apache-2.0) para XLSX, e [OpenPDF](https://github.com/LibrePDF/OpenPDF)
+2.0.x (LGPL-2.1/MPL-2.0) para PDF. DOCX e CSV são gerados sem dependências.
 
 ## Licença
 
