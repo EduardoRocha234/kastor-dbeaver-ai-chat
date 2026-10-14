@@ -395,13 +395,13 @@ final class ChatBrowserBridge {
     }
 
     private static String logoDataUri() {
-        try (InputStream in = ChatBrowserBridge.class.getResourceAsStream("/resources/chat/logo.png")) {
+        try (InputStream in = ChatBrowserBridge.class.getResourceAsStream("/icons/kastor-128.png")) {
             if (in == null) {
-                throw new IllegalStateException("Recurso ausente: logo.png");
+                throw new IllegalStateException("Recurso ausente: icons/kastor-128.png");
             }
             return "data:image/png;base64," + Base64.getEncoder().encodeToString(in.readAllBytes());
         } catch (IOException e) {
-            throw new IllegalStateException("Erro ao ler recurso logo.png", e);
+            throw new IllegalStateException("Erro ao ler recurso icons/kastor-128.png", e);
         }
     }
 
