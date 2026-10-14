@@ -13,6 +13,12 @@ jobs:
           distribution: temurin
           java-version: 17
           cache: maven
+      - name: Pin Maven 3.9.9 (Tycho 4.0.10 breaks on newer Maven)
+        run: |
+          curl -fsSL https://archive.apache.org/dist/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz | tar -xz -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/apache-maven-3.9.9/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/apache-maven-3.9.9/bin/mvn" -v
+          "$RUNNER_TEMP/apache-maven-3.9.9/bin/mvn" -v
       - name: Fetch DBeaver and build
         run: |
           scripts/fetch-dbeaver.sh 24.1.0
