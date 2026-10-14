@@ -11,4 +11,7 @@
   </parent>
   <artifactId>io.github.eduardo.dbeaver.aichat.update-site</artifactId>
   <packaging>eclipse-repository</packaging>
+  <build>
+    <finalName>kastor-dbeaver-ai-chat-v${unqualifiedVersion}</finalName>
+  </build>
 </project>

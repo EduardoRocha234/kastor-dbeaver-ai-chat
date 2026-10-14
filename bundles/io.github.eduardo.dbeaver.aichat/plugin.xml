@@ -7,7 +7,7 @@
             name="Kastor"
             category="org.jkiss.dbeaver.core.category"
             class="io.github.eduardo.dbeaver.aichat.ui.ChatView"
-            icon="icons/chat.png"
+            icon="icons/logo.png"
             restorable="true"/>
    </extension>
 
@@ -46,9 +46,9 @@
    </extension>
 
    <extension point="org.eclipse.ui.commandImages">
-      <image commandId="io.github.eduardo.dbeaver.aichat.openChat" icon="icons/chat.png"/>
-      <image commandId="io.github.eduardo.dbeaver.aichat.askAboutSelection" icon="icons/chat.png"/>
-      <image commandId="io.github.eduardo.dbeaver.aichat.referenceObject" icon="icons/chat.png"/>
+      <image commandId="io.github.eduardo.dbeaver.aichat.openChat" icon="icons/logo.png"/>
+      <image commandId="io.github.eduardo.dbeaver.aichat.askAboutSelection" icon="icons/logo.png"/>
+      <image commandId="io.github.eduardo.dbeaver.aichat.referenceObject" icon="icons/logo.png"/>
    </extension>
 
    <!-- Ctrl+Alt+K (Cmd+Option+K on macOS) opens or focuses the panel; free in DBeaver's default bindings.

@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -389,7 +390,19 @@ final class ChatBrowserBridge {
     }
 
     private static String loadPage() {
-        return resource("chat.html").replace("/*CSS*/", resource("chat.css")).replace("/*JS*/", resource("chat.js"));
+        return resource("chat.html").replace("/*CSS*/", resource("chat.css")).replace("/*JS*/", resource("chat.js"))
+            .replace("/*LOGO*/", logoDataUri());
+    }
+
+    private static String logoDataUri() {
+        try (InputStream in = ChatBrowserBridge.class.getResourceAsStream("/resources/chat/logo.png")) {
+            if (in == null) {
+                throw new IllegalStateException("Recurso ausente: logo.png");
+            }
+            return "data:image/png;base64," + Base64.getEncoder().encodeToString(in.readAllBytes());
+        } catch (IOException e) {
+            throw new IllegalStateException("Erro ao ler recurso logo.png", e);
+        }
     }
 
     private static String resource(String name) {

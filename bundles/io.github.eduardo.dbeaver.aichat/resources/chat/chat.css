@@ -1,12 +1,13 @@
 /* Kastor palette: graphite + terracotta/amber ("wood"), DBeaver blue for the bot. Dark is the reference;
    the light variant keeps the same accents. */
 :root {
+  --logo: url("/*LOGO*/");
   --bg: #f7f5f2; --chrome: #efebe6; --surface: #ffffff; --surface-2: #f1ece6; --border: #e2dbd2;
   --text: #2a2622; --muted: #7a746d;
   --user: #a0522d; --user-text: #ffffff;
   --amber: #d97706; --amber-text: #ffffff; --amber-soft: rgba(217, 119, 6, .14); --amber-line: rgba(217, 119, 6, .55);
   --mention-text: #b45309; --mention-on-user: #ffe2b8;
-  --bot: #2f7bd9;
+  --bot: #2f7bd9; --logo-bg: #fbf9f6;
   --tool-bg: #f1ece6; --tool-text: #7a746d; --ok: rgba(5, 150, 105, .75); --warn: #d97706; --danger: #c2410c;
   --danger-soft: #fdece4;
   --code-bg: #f4f4f5; --code-text: #27272a; --sql-kw: #1d4ed8; --sql-str: #b45309; --sql-num: #a16207;
@@ -19,7 +20,7 @@
   --user: #8b4513; --user-text: #ffffff;
   --amber: #d97706; --amber-text: #ffffff; --amber-soft: rgba(217, 119, 6, .15); --amber-line: rgba(217, 119, 6, .55);
   --mention-text: #f59e0b; --mention-on-user: #ffd9a0;
-  --bot: #2f7bd9;
+  --bot: #2f7bd9; --logo-bg: #1e1b18;
   --tool-bg: #22201d; --tool-text: #8e8a85; --ok: rgba(5, 150, 105, .7); --warn: #b7791f; --danger: #f87171;
   --danger-soft: #3a1f1c;
   --code-bg: #17181b; --code-text: #f4f4f5; --sql-kw: #60a5fa; --sql-str: #facc15; --sql-num: #fde68a;
@@ -61,10 +62,10 @@ kbd { font-family: inherit; font-size: 11px; padding: 0 5px; border: 1px solid v
 /* Welcome */
 #welcome { text-align: center; padding: 8vh 12px 0; color: var(--muted); }
 body.started #welcome { display: none; }
-#welcome .logo, .avatar {
-  display: grid; place-items: center; font-weight: 700; color: #fff; background: var(--bot);
+.avatar {
+  background: var(--logo-bg) var(--logo) center / 78% no-repeat; box-shadow: inset 0 0 0 1px var(--border);
 }
-#welcome .logo { width: 52px; height: 52px; margin: 0 auto 10px; border-radius: 16px; font-size: 24px; box-shadow: var(--shadow); }
+#welcome img.logo { display: block; width: 64px; height: 64px; margin: 0 auto 10px; padding: 6px; box-sizing: border-box; border-radius: 16px; background: var(--logo-bg); box-shadow: inset 0 0 0 1px var(--border); }
 #welcome h1 { margin: 0 0 6px; font-size: 20px; color: var(--text); }
 #welcome p { margin: 0 0 16px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }

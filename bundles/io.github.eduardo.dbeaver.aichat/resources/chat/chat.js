@@ -42,7 +42,7 @@
 
   function assistantRow(id) {
     var row = el('div', 'row assistant');
-    row.appendChild(el('div', 'avatar', 'K'));
+    row.appendChild(el('div', 'avatar'));
     var bubble = el('div', 'bubble');
     bubble.id = id;
     row.appendChild(bubble);
