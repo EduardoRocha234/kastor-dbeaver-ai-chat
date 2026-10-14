@@ -67,6 +67,20 @@ class GenerateFileToolTest {
     }
 
     @Test
+    void resultCanBeReadBackToRestoreTheFileCard() {
+        call("""
+                {"format":"xlsx","filename":"vendas (x)","datasets":[{"name":"a","sql":"select 1"}]}""");
+        ToolOutcome second = call("""
+                {"format":"xlsx","filename":"vendas (x)","datasets":[{"name":"a","sql":"select 1"}]}""");
+        GenerateFileResult parsed = GenerateFileResult.parse(second.content()).orElseThrow();
+        assertEquals("vendas (x) (2).xlsx", parsed.fileName());
+        assertEquals("xlsx", parsed.format());
+        assertEquals(2, parsed.rows());
+        assertTrue(GenerateFileResult.parse("Erro: algo").isEmpty());
+        assertTrue(GenerateFileResult.parse(null).isEmpty());
+    }
+
+    @Test
     void blocksWritesBeforeRunningAnything() throws Exception {
         ToolOutcome out = call("""
                 {"format":"xlsx","filename":"x","datasets":[{"name":"a","sql":"select 1"},

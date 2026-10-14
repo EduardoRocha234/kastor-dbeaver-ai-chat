@@ -39,7 +39,7 @@ final class GenerateFileTool implements DbTool {
 
     @Override
     public String name() {
-        return "generate_file";
+        return GenerateFileResult.TOOL_NAME;
     }
 
     @Override
@@ -190,7 +190,7 @@ final class GenerateFileTool implements DbTool {
     }
 
     private static String summary(Path path, ExportFormat format, List<DataTable> tables, long totalRows, long size) {
-        StringBuilder sb = new StringBuilder("Arquivo gerado e mostrado ao usuário: ").append(path.getFileName())
+        StringBuilder sb = new StringBuilder(GenerateFileResult.PREFIX).append(path.getFileName())
                 .append(" (").append(totalRows).append(" linha(s)");
         if (format == ExportFormat.XLSX) {
             sb.append(", ").append(tables.size()).append(" aba(s)");

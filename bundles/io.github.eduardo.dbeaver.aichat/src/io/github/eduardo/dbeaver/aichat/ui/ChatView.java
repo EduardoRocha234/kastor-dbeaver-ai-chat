@@ -24,6 +24,7 @@ import io.github.eduardo.dbeaver.aichat.core.mention.Mentions;
 import io.github.eduardo.dbeaver.aichat.core.tools.ConnectionInfo;
 import io.github.eduardo.dbeaver.aichat.core.tools.Decision;
 import io.github.eduardo.dbeaver.aichat.core.tools.ExportSettings;
+import io.github.eduardo.dbeaver.aichat.core.tools.GenerateFileResult;
 import io.github.eduardo.dbeaver.aichat.core.tools.GeneratedFile;
 import io.github.eduardo.dbeaver.aichat.core.tools.ToolContext;
 import io.github.eduardo.dbeaver.aichat.core.tools.ToolOutcome;
@@ -463,6 +464,7 @@ public class ChatView extends ViewPart {
     private void render(Conversation c) {
         bridge.clear();
         Map<String, String> toolDomIds = new HashMap<>();
+        Map<String, String> toolNames = new HashMap<>();
         for (ChatMessage m : c.messages()) {
             switch (m.role()) {
                 case USER:
@@ -477,6 +479,7 @@ public class ChatView extends ViewPart {
                     for (ToolCall call : m.toolCalls()) {
                         String domId = "t" + domCounter.incrementAndGet();
                         toolDomIds.put(call.id(), domId);
+                        toolNames.put(call.id(), call.name());
                         bridge.addTool(domId, call.name(), call.argumentsJson());
                     }
                     break;
@@ -486,11 +489,33 @@ public class ChatView extends ViewPart {
                     if (domId != null) {
                         bridge.setToolResult(domId, abbreviate(m.text()), m.error());
                     }
+                    if (!m.error() && GenerateFileResult.TOOL_NAME.equals(toolNames.remove(m.toolCallId()))) {
+                        GenerateFileResult.parse(m.text()).ifPresent(this::restoreFileCard);
+                    }
                     break;
                 }
                 default:
             }
         }
+    }
+
+    /** Live cards are not part of the saved conversation; rebuild them from generate_file's result. */
+    private void restoreFileCard(GenerateFileResult result) {
+        Path file = ProviderSettings.exportDirectory().resolve(result.fileName());
+        long size = -1;
+        try {
+            size = Files.size(file);
+        } catch (IOException | RuntimeException e) {
+            // moved, deleted or the export folder changed: still show what was generated
+        }
+        showFileCard(file, result.format(), size, result.rows());
+    }
+
+    private void showFileCard(Path file, String format, long sizeBytes, long rows) {
+        String details = format.toUpperCase(Locale.ROOT) + " · "
+                + (sizeBytes < 0 ? "arquivo não encontrado na pasta de exportação" : size(sizeBytes)) + " · "
+                + rows + (rows == 1 ? " linha" : " linhas");
+        bridge.addFileCard(file.toString(), file.getFileName().toString(), format, details);
     }
 
     private void deleteConversation(String id) {
@@ -822,10 +847,7 @@ public class ChatView extends ViewPart {
 
         /** Called by generate_file on the worker thread. */
         void fileGenerated(GeneratedFile file) {
-            String details = file.format().toUpperCase(Locale.ROOT) + " · " + size(file.sizeBytes()) + " · "
-                    + file.rows() + (file.rows() == 1 ? " linha" : " linhas");
-            ui(() -> bridge.addFileCard(file.path().toString(), file.path().getFileName().toString(), file.format(),
-                    details));
+            ui(() -> showFileCard(file.path(), file.format(), file.sizeBytes(), file.rows()));
         }
 
         @Override
