@@ -694,12 +694,29 @@ public class ChatView extends ViewPart {
 
         @Override
         public void onNotice(String message) {
-            ui(() -> bridge.addNotice(message));
+            ui(() -> {
+                dropPendingBubble();
+                bridge.addNotice(message);
+            });
         }
 
         @Override
         public void onError(String message) {
-            ui(() -> bridge.addError(message));
+            ui(() -> {
+                dropPendingBubble();
+                bridge.addError(message);
+            });
+        }
+
+        /** A failed request never reaches onAssistantEnd, which would leave the "typing" bubble spinning. */
+        private void dropPendingBubble() {
+            String id;
+            synchronized (this) {
+                id = messageId;
+            }
+            if (id != null) {
+                bridge.finishAssistant(id);
+            }
         }
 
         @Override

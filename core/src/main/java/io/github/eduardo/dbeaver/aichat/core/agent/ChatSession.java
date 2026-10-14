@@ -14,8 +14,10 @@ import io.github.eduardo.dbeaver.aichat.core.llm.ToolCall;
 import io.github.eduardo.dbeaver.aichat.core.tools.ToolContext;
 import io.github.eduardo.dbeaver.aichat.core.tools.ToolOutcome;
 import io.github.eduardo.dbeaver.aichat.core.tools.ToolRegistry;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 /** Runs one user turn: model -> tools -> model ... until a final answer, a stop, or the iteration limit. */
@@ -42,7 +44,7 @@ public final class ChatSession {
         try {
             for (int iteration = 0; iteration < settings.maxIterations(); iteration++) {
                 cancel.throwIfCancelled();
-                ChatRequest request = new ChatRequest(config.model(), systemPrompt, conversation.messages(),
+                ChatRequest request = new ChatRequest(config.model(), systemPrompt, compactHistory(conversation.messages()),
                         tools.specs(), config.maxTokens(), config.temperature());
                 listener.onAssistantStart();
                 AssistantTurn turn = provider.stream(request, listener::onTextDelta, cancel);
@@ -66,13 +68,50 @@ public final class ChatSession {
         } catch (CancelledException e) {
             listener.onNotice("Cancelado.");
         } catch (LlmException e) {
-            listener.onError(e.getMessage());
+            listener.onError(friendly(e));
         } catch (RuntimeException | LinkageError e) {
             listener.onError("Erro inesperado: " + e);
         } finally {
             closeDangling();
             listener.onTurnFinished();
         }
+    }
+
+    static final int OLD_TOOL_RESULT_CHARS = 1000;
+
+    /**
+     * Tool results from earlier questions are only context; cut them so a long chat does not blow the
+     * provider's tokens-per-minute limit. Results of the current question stay whole.
+     */
+    static List<ChatMessage> compactHistory(List<ChatMessage> messages) {
+        int lastUser = -1;
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            if (messages.get(i).role() == Role.USER) {
+                lastUser = i;
+                break;
+            }
+        }
+        List<ChatMessage> out = new ArrayList<>(messages.size());
+        for (int i = 0; i < messages.size(); i++) {
+            ChatMessage m = messages.get(i);
+            if (i < lastUser && m.role() == Role.TOOL && m.text().length() > OLD_TOOL_RESULT_CHARS) {
+                m = ChatMessage.toolResult(m.toolCallId(),
+                        m.text().substring(0, OLD_TOOL_RESULT_CHARS) + "\n[... truncado]", m.error());
+            }
+            out.add(m);
+        }
+        return out;
+    }
+
+    /** Explains the usual free-tier failures; the provider's own message follows. */
+    static String friendly(LlmException e) {
+        String msg = e.getMessage() == null ? "" : e.getMessage();
+        String lower = msg.toLowerCase(Locale.ROOT);
+        if (e.status() == 413 || e.status() == 429 || lower.contains("rate_limit") || lower.contains("rate limit")) {
+            return "Limite de uso do provedor atingido (tokens ou requisições por minuto). Aguarde alguns segundos, "
+                    + "abra uma nova conversa para reduzir o contexto ou escolha outro modelo. Detalhe: " + msg;
+        }
+        return msg;
     }
 
     /**
