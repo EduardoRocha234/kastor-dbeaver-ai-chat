@@ -18,7 +18,11 @@ Use o modelo que quiser: qualquer API compatível com OpenAI (OpenAI, Ollama, LM
 
 ### Instalação
 
-Você precisa do arquivo `kastor-dbeaver-ai-chat-vX.X.X.zip` (o update site do plugin).
+**Recomendado (atualiza sozinho):** em **Ajuda (Help) → Install New Software… → Add…**, informe um nome (ex.: `Kastor`) e a URL
+`https://eduardorocha234.github.io/kastor-dbeaver-ai-chat/`. Marque **Kastor - DBeaver AI Chat** e siga até o fim (passos 4 e 5 abaixo).
+Depois, para atualizar basta **Ajuda → Check for Updates**. O Kastor também avisa no chat quando há versão nova.
+
+**Alternativa offline:** você precisa do arquivo `kastor-dbeaver-ai-chat-vX.X.X.zip` (o update site do plugin).
 **[Baixar o instalador mais recente](https://github.com/EduardoRocha234/kastor-dbeaver-ai-chat/releases/latest)** (em *Assets*). Para gerá-lo a partir do código, veja [Build](#build).
 Não é preciso extrair o zip.
 
@@ -40,7 +44,7 @@ Não é preciso extrair o zip.
 
 **5.** Avance, aceite a licença e o aviso de conteúdo não assinado (**Install anyway**) e reinicie o DBeaver quando pedir.
 
-Para atualizar, repita os passos com o zip da nova versão. Para remover: **Ajuda → Installation Information → Installed Software**.
+Para atualizar: **Ajuda → Check for Updates** (instalação pela URL) ou repita os passos com o zip da nova versão (instalação offline). A verificação automática no chat pode ser desligada em Preferências → Kastor. Para remover: **Ajuda → Installation Information → Installed Software**.
 
 ## O que o Kastor pode fazer
 
@@ -201,3 +205,9 @@ O update site sai em `releng/update-site/target/kastor-dbeaver-ai-chat-v<versão
 ## Licença
 
 [MIT](LICENSE) © 2026 Eduardo Aleixo.
+
+## Releasing
+
+1. `scripts/release.sh X.Y.Z` altera a versão em todos os arquivos (`scripts/bump-version.sh`), roda build e testes, cria o commit `chore(release)` e a tag `vX.Y.Z`, e pergunta antes de fazer o push.
+2. O push da tag dispara `.github/workflows/release.yml`: cria a release no GitHub com o zip e publica o update site no GitHub Pages.
+3. Pré-requisito (uma vez): em *Settings → Pages* do repositório, selecione **Source: GitHub Actions**.

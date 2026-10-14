@@ -675,6 +675,13 @@
       hideMenu();
     },
     setVersion: function (text) { byId('version').textContent = text; },
+    setUpdate: function (version, url) {
+      byId('update-text').textContent = 'Kastor ' + version + ' disponível. Atualize em Ajuda > Check for Updates.';
+      byId('update-open').onclick = function () { aichatOpenLink(url); };
+      byId('update-dismiss').onclick = function () { aichatDismissUpdate(version); };
+      byId('update-banner').hidden = false;
+    },
+    hideUpdate: function () { byId('update-banner').hidden = true; },
     setTitle: function (text) {
       var t = byId('title');
       t.textContent = text;

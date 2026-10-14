@@ -60,6 +60,7 @@ public class AiChatPreferencePage extends PreferencePage implements IWorkbenchPr
     private Button allowWrites;
     private Text maskColumns;
     private Button audit;
+    private Button updateCheck;
 
     @Override
     public void init(IWorkbench workbench) {
@@ -111,6 +112,11 @@ public class AiChatPreferencePage extends PreferencePage implements IWorkbenchPr
                 ProviderSettings.sessionSettings().maxIterations());
 
         createSecurityGroup(root);
+
+        updateCheck = new Button(root, SWT.CHECK);
+        updateCheck.setText("Verificar atualizações do Kastor automaticamente (consulta o GitHub no máximo 1x por dia)");
+        updateCheck.setSelection(ProviderSettings.updateCheckEnabled());
+        updateCheck.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
 
         Label warning = new Label(root, SWT.WRAP);
         warning.setText("Atenção: nomes de tabelas, estruturas e resultados de consultas (até os limites acima) "
@@ -304,6 +310,7 @@ public class AiChatPreferencePage extends PreferencePage implements IWorkbenchPr
             allowWrites.setSelection(true);
         }
         maskColumns.setText("");
+        updateCheck.setSelection(true);
         if (audit.isEnabled()) {
             audit.setSelection(true);
         }
@@ -325,6 +332,7 @@ public class AiChatPreferencePage extends PreferencePage implements IWorkbenchPr
                     ToolLimits.DEFAULT.maxListItems()), maxIterations.getSelection());
             ProviderSettings.saveSecurity(allowWrites.getSelection(), maskColumns.getText().trim(),
                     audit.getSelection());
+            ProviderSettings.setUpdateCheckEnabled(updateCheck.getSelection());
             pendingKeys.clear();
             removedIds.clear();
             return true;

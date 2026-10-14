@@ -15,6 +15,7 @@ import io.github.eduardo.dbeaver.aichat.core.llm.AssistantTurn;
 import io.github.eduardo.dbeaver.aichat.core.llm.ChatMessage;
 import io.github.eduardo.dbeaver.aichat.core.llm.LlmException;
 import io.github.eduardo.dbeaver.aichat.core.llm.ModelLister;
+import io.github.eduardo.dbeaver.aichat.core.update.UpdateChecker;
 import io.github.eduardo.dbeaver.aichat.core.llm.ProviderConfig;
 import io.github.eduardo.dbeaver.aichat.core.llm.ProviderFactory;
 import io.github.eduardo.dbeaver.aichat.core.llm.ToolCall;
@@ -37,6 +38,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -65,6 +67,7 @@ public class ChatView extends ViewPart {
     private static final Log log = Log.getLog(ChatView.class);
     private static final String EDITOR_CONNECTION = "(conexão do editor ativo)";
     private static final int MAX_INPUT_CHARS = 50_000;
+    private static final long UPDATE_CHECK_INTERVAL_MS = 24L * 60 * 60 * 1000;
     private static final int MAX_TOOL_RESULT_CHARS = 4000;
 
     private final DBeaverGateway gateway = new DBeaverGateway();
@@ -98,6 +101,7 @@ public class ChatView extends ViewPart {
         approvalGate = new UiApprovalGate(display, bridge);
         bridge.setTheme(isDark(parent));
         bridge.setVersion(versionLabel());
+        checkForUpdate();
         mentions = new MentionAssist(display, gateway,
                 () -> selectedConnectionId(EditorContextResolver.fromActiveEditor(window())), bridge::showMentions);
         refreshProviders();
@@ -149,6 +153,28 @@ public class ChatView extends ViewPart {
         refreshEditorContext();
         bridge.setInput("Explique o SQL selecionado.", true);
         bridge.focusInput();
+    }
+
+    /** At most once a day, in the background; failures are silent. Skips versions the user dismissed. */
+    private void checkForUpdate() {
+        long now = System.currentTimeMillis();
+        if (!ProviderSettings.updateCheckEnabled() || now - ProviderSettings.lastUpdateCheck() < UPDATE_CHECK_INTERVAL_MS) {
+            return;
+        }
+        Version v = Activator.getDefault().getBundle().getVersion();
+        String current = v.getMajor() + "." + v.getMinor() + "." + v.getMicro();
+        Job.create("Kastor: verificar atualização", monitor -> {
+            Optional<UpdateChecker.UpdateInfo> update =
+                    UpdateChecker.check(current, http, UpdateChecker.LATEST_RELEASE_URL);
+            ProviderSettings.saveUpdateState(now, null);
+            if (update.isPresent() && !update.get().version().equals(ProviderSettings.dismissedVersion())) {
+                display.asyncExec(() -> {
+                    if (!bridge.isDisposed()) {
+                        bridge.setUpdate(update.get().version(), update.get().url());
+                    }
+                });
+            }
+        }).schedule();
     }
 
     /** "Kastor 0.1.0 · build 13/10/2026 20:57" from the bundle version (qualifier = build timestamp, UTC). */
@@ -604,6 +630,12 @@ public class ChatView extends ViewPart {
         @Override
         public void openSettings() {
             openPreferences();
+        }
+
+        @Override
+        public void dismissUpdate(String version) {
+            ProviderSettings.saveUpdateState(ProviderSettings.lastUpdateCheck(), version);
+            bridge.hideUpdate();
         }
     }
 

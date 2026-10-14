@@ -34,6 +34,9 @@ public final class ProviderSettings {
     private static final String KEY_ALLOW_WRITES = "allowWrites";
     private static final String KEY_MASK_COLUMNS = "maskColumns";
     private static final String KEY_AUDIT = "auditEnabled";
+    private static final String KEY_UPDATE_CHECK = "updateCheckEnabled";
+    private static final String KEY_LAST_UPDATE_CHECK = "lastUpdateCheck";
+    private static final String KEY_DISMISSED_VERSION = "dismissedVersion";
     private static final String SECURE_NODE = Activator.PLUGIN_ID + "/apiKeys";
 
     private ProviderSettings() {
@@ -124,6 +127,37 @@ public final class ProviderSettings {
         p.putInt(KEY_MAX_CHARS, limits.maxResultChars());
         p.putInt(KEY_MAX_ITERATIONS, maxIterations);
         p.flush();
+    }
+
+    public static boolean updateCheckEnabled() {
+        return prefs().getBoolean(KEY_UPDATE_CHECK, true);
+    }
+
+    public static void setUpdateCheckEnabled(boolean enabled) throws BackingStoreException {
+        prefs().putBoolean(KEY_UPDATE_CHECK, enabled);
+        prefs().flush();
+    }
+
+    public static long lastUpdateCheck() {
+        return prefs().getLong(KEY_LAST_UPDATE_CHECK, 0);
+    }
+
+    public static String dismissedVersion() {
+        return prefs().get(KEY_DISMISSED_VERSION, "");
+    }
+
+    /** Remembers when the check ran and, if given, which version the user waved away. */
+    public static void saveUpdateState(long checkedAt, String dismissedVersion) {
+        IEclipsePreferences p = prefs();
+        p.putLong(KEY_LAST_UPDATE_CHECK, checkedAt);
+        if (dismissedVersion != null) {
+            p.put(KEY_DISMISSED_VERSION, dismissedVersion);
+        }
+        try {
+            p.flush();
+        } catch (BackingStoreException e) {
+            log.warn("Could not save update state", e);
+        }
     }
 
     // Admin overrides, set as -D flags in dbeaver.ini. They can only tighten the user's preferences.

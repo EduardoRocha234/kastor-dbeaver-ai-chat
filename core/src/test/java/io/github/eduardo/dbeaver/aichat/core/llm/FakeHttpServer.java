@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /** Local HTTP server that replays queued responses and records requests. */
-final class FakeHttpServer implements AutoCloseable {
+public final class FakeHttpServer implements AutoCloseable {
 
     private record Response(int status, String body) {
     }
@@ -25,7 +25,7 @@ final class FakeHttpServer implements AutoCloseable {
     volatile String lastPath;
     volatile Headers lastHeaders;
 
-    FakeHttpServer() throws IOException {
+    public FakeHttpServer() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
             lastPath = exchange.getRequestURI().getPath();
@@ -45,11 +45,11 @@ final class FakeHttpServer implements AutoCloseable {
         server.start();
     }
 
-    void enqueue(int status, String body) {
+    public void enqueue(int status, String body) {
         queue.add(new Response(status, body));
     }
 
-    String baseUrl() {
+    public String baseUrl() {
         return "http://127.0.0.1:" + server.getAddress().getPort();
     }
 

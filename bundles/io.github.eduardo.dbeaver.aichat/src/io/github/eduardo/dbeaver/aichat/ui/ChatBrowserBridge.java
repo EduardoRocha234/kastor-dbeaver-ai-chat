@@ -73,6 +73,8 @@ final class ChatBrowserBridge {
         void deleteConversation(String id);
 
         void openSettings();
+
+        void dismissUpdate(String version);
     }
 
     private static final Log log = Log.getLog(ChatBrowserBridge.class);
@@ -121,6 +123,7 @@ final class ChatBrowserBridge {
         function("aichatOpenConversation", callbacks::openConversation);
         function("aichatDeleteConversation", callbacks::deleteConversation);
         function("aichatOpenSettings", arg -> callbacks.openSettings());
+        function("aichatDismissUpdate", callbacks::dismissUpdate);
         function("aichatMention", arg -> {
             JsonObject request = Json.parseObject(arg);
             callbacks.mention(request.get("seq").getAsInt(), request.get("query").getAsString());
@@ -270,6 +273,15 @@ final class ChatBrowserBridge {
 
     void setVersion(String version) {
         stateCall("setVersion", version);
+    }
+
+    void setUpdate(String version, String url) {
+        stateCall("setUpdate", version, url);
+    }
+
+    void hideUpdate() {
+        state.remove("setUpdate");
+        transientCall("hideUpdate");
     }
 
     void setTitle(String title) {
