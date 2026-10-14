@@ -24,7 +24,8 @@ escritas aprovadas são confirmadas (commit) na hora.
 
 ## Instalação
 
-Você precisa do arquivo `kastor-dbeaver-ai-chat-vX.X.X.zip` (o update site do plugin). Para gerá-lo a partir do código, veja [Build](#build).
+Você precisa do arquivo `kastor-dbeaver-ai-chat-vX.X.X.zip` (o update site do plugin).
+**[Baixar o instalador mais recente](https://github.com/EduardoRocha234/kastor-dbeaver-ai-chat/releases/latest)** (em *Assets*). Para gerá-lo a partir do código, veja [Build](#build).
 Não é preciso extrair o zip.
 
 **1.** No DBeaver, abra **Ajuda (Help) → Install New Software…**
