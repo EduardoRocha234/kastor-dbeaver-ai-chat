@@ -40,7 +40,13 @@ final class ExecuteWriteTool implements DbTool {
         String sql = Args.requireString(args, "sql");
         String reason = Args.optString(args, "reason");
         String schema = Args.optString(args, "schema");
+        ToolPolicy policy = ctx.policy();
+        if (!policy.allowWrites()) {
+            policy.audit(name(), conn, schema, sql, "blocked", null, null, "writes disabled in settings");
+            throw new ToolException("A escrita está desativada nas configurações do Kastor. Não tente executar comandos que alterem dados.");
+        }
         if (conn.readOnly()) {
+            policy.audit(name(), conn, schema, sql, "blocked", null, null, "connection is read-only");
             throw new ToolException("A conexão " + conn.name() + " está marcada como somente leitura no DBeaver; escrita bloqueada.");
         }
         if (SqlClassifier.statementCount(sql) > 1) {
@@ -49,9 +55,17 @@ final class ExecuteWriteTool implements DbTool {
         String target = schema == null ? conn.name() : conn.name() + " / " + schema;
         Decision decision = ctx.approvalGate().requestApproval(new ApprovalRequest(target, sql, reason), ctx.cancel());
         if (decision != Decision.APPROVED) {
+            policy.audit(name(), conn, schema, sql, "rejected", null, null, reason);
             return ToolOutcome.error("O usuário rejeitou a execução. Não tente de novo sem perguntar ao usuário.");
         }
-        long count = gateway.executeUpdate(conn.id(), schema, sql, ctx.cancel());
+        long count;
+        try {
+            count = gateway.executeUpdate(conn.id(), schema, sql, ctx.cancel());
+        } catch (GatewayException e) {
+            policy.audit(name(), conn, schema, sql, "error", null, null, e.getMessage());
+            throw e;
+        }
+        policy.audit(name(), conn, schema, sql, "executed", count < 0 ? null : count, null, reason);
         return ToolOutcome.ok("Executado com sucesso na conexão " + conn.name() + ". Linhas afetadas: "
                 + (count < 0 ? "não informado" : count));
     }

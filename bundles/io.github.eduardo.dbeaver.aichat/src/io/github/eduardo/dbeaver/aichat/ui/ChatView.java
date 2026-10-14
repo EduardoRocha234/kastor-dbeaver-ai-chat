@@ -274,7 +274,8 @@ public class ChatView extends ViewPart {
         ChatSession session = new ChatSession(current,
                 ProviderFactory.create(config, ProviderSettings.apiKey(config.id()), http),
                 config, tools, ProviderSettings.sessionSettings());
-        ToolContext toolContext = new ToolContext(connectionId, approvalGate, token, ProviderSettings.toolLimits());
+        ToolContext toolContext = new ToolContext(connectionId, approvalGate, token, ProviderSettings.toolLimits(),
+                ProviderSettings.toolPolicy());
         UiListener listener = new UiListener(token, current);
         Job job = Job.create("Kastor", monitor -> {
             String systemPrompt = SystemPromptBuilder.build(new PromptContext(connection, dialect, editorSchema,

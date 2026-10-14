@@ -43,7 +43,7 @@ final class DescribeTableTool implements DbTool {
         sb.append(d.name()).append(" (").append(d.type()).append(")\nColunas:\n");
         for (ColumnInfo c : d.columns()) {
             sb.append("- ").append(c.name()).append(' ').append(c.type()).append(c.nullable() ? " NULL" : " NOT NULL");
-            if (c.defaultValue() != null && !c.defaultValue().isBlank()) {
+            if (c.defaultValue() != null && !c.defaultValue().isBlank() && !ctx.policy().masker().matches(c.name())) {
                 sb.append(" DEFAULT ").append(c.defaultValue());
             }
             sb.append('\n');

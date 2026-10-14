@@ -1,5 +1,6 @@
 package io.github.eduardo.dbeaver.aichat.settings;
 
+import io.github.eduardo.dbeaver.aichat.Activator;
 import io.github.eduardo.dbeaver.aichat.core.CancellationToken;
 import io.github.eduardo.dbeaver.aichat.core.agent.SessionSettings;
 import io.github.eduardo.dbeaver.aichat.core.llm.AssistantTurn;
@@ -37,7 +38,9 @@ import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Group;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Spinner;
+import org.eclipse.swt.program.Program;
 import org.eclipse.swt.widgets.Table;
+import org.eclipse.swt.widgets.Text;
 import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.IWorkbenchPreferencePage;
 
@@ -54,6 +57,9 @@ public class AiChatPreferencePage extends PreferencePage implements IWorkbenchPr
     private Spinner maxRows;
     private Spinner maxChars;
     private Spinner maxIterations;
+    private Button allowWrites;
+    private Text maskColumns;
+    private Button audit;
 
     @Override
     public void init(IWorkbench workbench) {
@@ -104,13 +110,72 @@ public class AiChatPreferencePage extends PreferencePage implements IWorkbenchPr
         maxIterations = spinner(limits, "Máximo de chamadas ao modelo por pergunta:", 1, 50,
                 ProviderSettings.sessionSettings().maxIterations());
 
+        createSecurityGroup(root);
+
         Label warning = new Label(root, SWT.WRAP);
         warning.setText("Atenção: nomes de tabelas, estruturas e resultados de consultas (até os limites acima) "
-                + "são enviados ao provedor de IA configurado. Comandos de escrita sempre exigem sua aprovação no chat.");
+                + "são enviados ao provedor de IA configurado, exceto os valores de colunas mascaradas. "
+                + "Comandos de escrita sempre exigem sua aprovação no chat.");
         GridData warningData = new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1);
         warningData.widthHint = 520;
         warning.setLayoutData(warningData);
         return root;
+    }
+
+    private void createSecurityGroup(Composite root) {
+        Group group = new Group(root, SWT.NONE);
+        group.setText("Segurança");
+        group.setLayout(new GridLayout(2, false));
+        group.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
+
+        allowWrites = new Button(group, SWT.CHECK);
+        boolean writesLocked = ProviderSettings.writesLockedByAdmin();
+        allowWrites.setText(writesLocked ? "Permitir comandos de escrita (desativado pelo administrador)"
+                : "Permitir comandos de escrita (sempre com aprovação)");
+        allowWrites.setSelection(ProviderSettings.writesAllowed());
+        allowWrites.setEnabled(!writesLocked);
+        allowWrites.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
+
+        Label maskLabel = new Label(group, SWT.WRAP);
+        String adminMask = ProviderSettings.adminMaskedColumns().trim();
+        maskLabel.setText("Colunas mascaradas (nomes separados por vírgula; * e ? são curingas; ex.: cpf, *senha*, email)."
+                + " Os valores dessas colunas não são enviados ao provedor de IA."
+                + (adminMask.isEmpty() ? "" : " Definidas pelo administrador: " + adminMask + "."));
+        GridData maskLabelData = new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1);
+        maskLabelData.widthHint = 500;
+        maskLabel.setLayoutData(maskLabelData);
+        maskColumns = new Text(group, SWT.BORDER | SWT.MULTI | SWT.WRAP | SWT.V_SCROLL);
+        maskColumns.setText(ProviderSettings.userMaskedColumns());
+        GridData maskData = new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1);
+        maskData.heightHint = 48;
+        maskColumns.setLayoutData(maskData);
+
+        audit = new Button(group, SWT.CHECK);
+        boolean auditLocked = ProviderSettings.auditLockedByAdmin();
+        audit.setText(auditLocked ? "Registrar auditoria local (exigido pelo administrador)"
+                : "Registrar auditoria local (consultas e comandos pedidos pelo modelo)");
+        audit.setSelection(ProviderSettings.auditEnabled());
+        audit.setEnabled(!auditLocked);
+        audit.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
+
+        Label path = new Label(group, SWT.WRAP);
+        path.setText("Arquivo: " + auditFile());
+        path.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        button(group, "Abrir pasta", this::openAuditFolder);
+    }
+
+    private static java.nio.file.Path auditFile() {
+        return Activator.getDefault().auditFile();
+    }
+
+    private void openAuditFolder() {
+        try {
+            java.nio.file.Path dir = auditFile().getParent();
+            java.nio.file.Files.createDirectories(dir);
+            Program.launch(dir.toString());
+        } catch (java.io.IOException e) {
+            MessageDialog.openError(getShell(), "Kastor", "Não foi possível abrir a pasta: " + e.getMessage());
+        }
     }
 
     private void column(String title, int width, Function<ProviderConfig, String> text) {
@@ -235,6 +300,13 @@ public class AiChatPreferencePage extends PreferencePage implements IWorkbenchPr
         maxRows.setSelection(ToolLimits.DEFAULT.maxRows());
         maxChars.setSelection(ToolLimits.DEFAULT.maxResultChars());
         maxIterations.setSelection(SessionSettings.DEFAULT.maxIterations());
+        if (allowWrites.isEnabled()) {
+            allowWrites.setSelection(true);
+        }
+        maskColumns.setText("");
+        if (audit.isEnabled()) {
+            audit.setSelection(true);
+        }
         super.performDefaults();
     }
 
@@ -251,6 +323,8 @@ public class AiChatPreferencePage extends PreferencePage implements IWorkbenchPr
             }
             ProviderSettings.saveLimits(new ToolLimits(maxRows.getSelection(), maxChars.getSelection(),
                     ToolLimits.DEFAULT.maxListItems()), maxIterations.getSelection());
+            ProviderSettings.saveSecurity(allowWrites.getSelection(), maskColumns.getText().trim(),
+                    audit.getSelection());
             pendingKeys.clear();
             removedIds.clear();
             return true;

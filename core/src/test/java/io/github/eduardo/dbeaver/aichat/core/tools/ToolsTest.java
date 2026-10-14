@@ -3,6 +3,7 @@ package io.github.eduardo.dbeaver.aichat.core.tools;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.github.eduardo.dbeaver.aichat.core.CancellationToken;
+import io.github.eduardo.dbeaver.aichat.core.audit.AuditEvent;
 import io.github.eduardo.dbeaver.aichat.core.llm.ToolCall;
 import io.github.eduardo.dbeaver.aichat.core.sql.SqlClassifier.SqlKind;
 import java.util.ArrayList;
@@ -125,6 +126,42 @@ class ToolsTest {
         assertEquals("prod-pg", approvals.get(0).connectionName());
         assertEquals("limpar teste", approvals.get(0).reason());
         assertTrue(out.content().contains("Linhas afetadas: 3"));
+    }
+
+    private ToolContext ctx(ToolPolicy policy) {
+        return new ToolContext("pg-1", (r, c) -> Decision.APPROVED, new CancellationToken(), ToolLimits.DEFAULT, policy);
+    }
+
+    @Test
+    void writesDisabledBlocksExecuteWriteAndIsAudited() {
+        List<AuditEvent> events = new ArrayList<>();
+        ToolPolicy policy = new ToolPolicy(false, ColumnMasker.NONE, events::add);
+        ToolOutcome out = call("execute_write", "{\"sql\":\"delete from orders\",\"reason\":\"x\"}", ctx(policy));
+        assertTrue(out.error());
+        assertTrue(gateway.writes.isEmpty());
+        assertEquals("blocked", events.get(0).outcome());
+    }
+
+    @Test
+    void maskedColumnsNeverReachTheModelAndAreAudited() {
+        List<AuditEvent> events = new ArrayList<>();
+        ToolPolicy policy = new ToolPolicy(true, ColumnMasker.parse("name"), events::add);
+        ToolOutcome out = call("run_query", "{\"sql\":\"select id, name from c\"}", ctx(policy));
+        assertFalse(out.content().contains("Ana"), out.content());
+        assertTrue(out.content().contains("1 | ***"), out.content());
+        assertEquals("executed", events.get(0).outcome());
+        assertEquals(List.of("name"), events.get(0).maskedColumns());
+        assertEquals(2L, events.get(0).rows());
+    }
+
+    @Test
+    void rejectedWriteIsAudited() {
+        List<AuditEvent> events = new ArrayList<>();
+        ToolContext c = new ToolContext("pg-1", (r, k) -> Decision.REJECTED, new CancellationToken(), ToolLimits.DEFAULT,
+                new ToolPolicy(true, ColumnMasker.NONE, events::add));
+        call("execute_write", "{\"sql\":\"delete from orders\",\"reason\":\"x\"}", c);
+        assertEquals("rejected", events.get(0).outcome());
+        assertTrue(gateway.writes.isEmpty());
     }
 
     @Test

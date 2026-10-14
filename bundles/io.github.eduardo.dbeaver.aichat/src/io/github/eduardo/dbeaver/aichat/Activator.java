@@ -25,6 +25,11 @@ public class Activator extends AbstractUIPlugin {
         return plugin;
     }
 
+    /** {workspace}/.metadata/.plugins/io.github.eduardo.dbeaver.aichat/audit/audit.jsonl */
+    public java.nio.file.Path auditFile() {
+        return getStateLocation().append("audit").append("audit.jsonl").toFile().toPath();
+    }
+
     /** {workspace}/.metadata/.plugins/io.github.eduardo.dbeaver.aichat/conversations */
     public java.nio.file.Path conversationsDir() {
         return getStateLocation().append("conversations").toFile().toPath();

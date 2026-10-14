@@ -41,7 +41,10 @@ final class RunQueryTool implements DbTool {
         String sql = Args.requireString(args, "sql");
         boolean read = SqlClassifier.classify(sql) == SqlKind.READ
                 && gateway.classifyNative(conn.id(), sql).orElse(SqlKind.READ) == SqlKind.READ;
+        ToolPolicy policy = ctx.policy();
+        String schema = Args.optString(args, "schema");
         if (!read) {
+            policy.audit(name(), conn, schema, sql, "blocked", null, null, "not confirmed read-only");
             throw new ToolException("Este SQL modifica dados ou não pôde ser confirmado como somente leitura. "
                     + "Use execute_write (exige aprovação do usuário) ou reescreva como um único SELECT.");
         }
@@ -50,7 +53,16 @@ final class RunQueryTool implements DbTool {
         if (requested != null && requested > 0) {
             maxRows = Math.min(requested, maxRows);
         }
-        QueryResult result = gateway.runReadQuery(conn.id(), Args.optString(args, "schema"), sql, maxRows, ctx.cancel());
+        QueryResult raw;
+        try {
+            raw = gateway.runReadQuery(conn.id(), schema, sql, maxRows, ctx.cancel());
+        } catch (GatewayException e) {
+            policy.audit(name(), conn, schema, sql, "error", null, null, e.getMessage());
+            throw e;
+        }
+        QueryResult result = policy.masker().apply(raw);
+        policy.audit(name(), conn, schema, sql, "executed", (long) raw.rows().size(),
+                policy.masker().maskedColumns(raw.columns()), null);
         String header = result.rows().size() + " linha(s)"
                 + (result.truncated() ? " (limite de " + maxRows + " atingido; pode haver mais)" : "") + "\n";
         return ToolOutcome.ok(header + TextTable.format(result, ctx.limits().maxResultChars()));

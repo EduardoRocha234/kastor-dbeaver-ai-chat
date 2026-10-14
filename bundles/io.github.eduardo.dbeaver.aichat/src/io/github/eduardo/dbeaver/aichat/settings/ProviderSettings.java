@@ -5,7 +5,11 @@ import io.github.eduardo.dbeaver.aichat.Activator;
 import io.github.eduardo.dbeaver.aichat.core.Json;
 import io.github.eduardo.dbeaver.aichat.core.agent.SessionSettings;
 import io.github.eduardo.dbeaver.aichat.core.llm.ProviderConfig;
+import io.github.eduardo.dbeaver.aichat.core.audit.AuditLog;
+import io.github.eduardo.dbeaver.aichat.core.audit.JsonlAuditLog;
+import io.github.eduardo.dbeaver.aichat.core.tools.ColumnMasker;
 import io.github.eduardo.dbeaver.aichat.core.tools.ToolLimits;
+import io.github.eduardo.dbeaver.aichat.core.tools.ToolPolicy;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,6 +31,9 @@ public final class ProviderSettings {
     private static final String KEY_MAX_ROWS = "maxRows";
     private static final String KEY_MAX_CHARS = "maxResultChars";
     private static final String KEY_MAX_ITERATIONS = "maxIterations";
+    private static final String KEY_ALLOW_WRITES = "allowWrites";
+    private static final String KEY_MASK_COLUMNS = "maskColumns";
+    private static final String KEY_AUDIT = "auditEnabled";
     private static final String SECURE_NODE = Activator.PLUGIN_ID + "/apiKeys";
 
     private ProviderSettings() {
@@ -117,6 +124,61 @@ public final class ProviderSettings {
         p.putInt(KEY_MAX_CHARS, limits.maxResultChars());
         p.putInt(KEY_MAX_ITERATIONS, maxIterations);
         p.flush();
+    }
+
+    // Admin overrides, set as -D flags in dbeaver.ini. They can only tighten the user's preferences.
+    public static final String PROP_WRITES_DISABLED = "kastor.writes.disabled";
+    public static final String PROP_MASK_COLUMNS = "kastor.mask.columns";
+    public static final String PROP_AUDIT_ENABLED = "kastor.audit.enabled";
+
+    private static final long AUDIT_MAX_BYTES = 5L * 1024 * 1024;
+    private static JsonlAuditLog auditLog;
+
+    public static boolean writesLockedByAdmin() {
+        return Boolean.getBoolean(PROP_WRITES_DISABLED);
+    }
+
+    public static boolean writesAllowed() {
+        return !writesLockedByAdmin() && prefs().getBoolean(KEY_ALLOW_WRITES, true);
+    }
+
+    /** Patterns set by the user in the preference page. */
+    public static String userMaskedColumns() {
+        return prefs().get(KEY_MASK_COLUMNS, "");
+    }
+
+    public static String adminMaskedColumns() {
+        return System.getProperty(PROP_MASK_COLUMNS, "");
+    }
+
+    public static boolean auditLockedByAdmin() {
+        return Boolean.getBoolean(PROP_AUDIT_ENABLED);
+    }
+
+    public static boolean auditEnabled() {
+        return auditLockedByAdmin() || prefs().getBoolean(KEY_AUDIT, true);
+    }
+
+    public static void saveSecurity(boolean allowWrites, String maskedColumns, boolean audit) throws BackingStoreException {
+        IEclipsePreferences p = prefs();
+        p.putBoolean(KEY_ALLOW_WRITES, allowWrites);
+        p.put(KEY_MASK_COLUMNS, maskedColumns);
+        p.putBoolean(KEY_AUDIT, audit);
+        p.flush();
+    }
+
+    /** Read on every message, so changes in the preference page apply without reopening the chat. */
+    public static ToolPolicy toolPolicy() {
+        return new ToolPolicy(writesAllowed(),
+                ColumnMasker.parse(adminMaskedColumns() + "," + userMaskedColumns()),
+                auditEnabled() ? auditLog() : AuditLog.NONE);
+    }
+
+    private static synchronized JsonlAuditLog auditLog() {
+        if (auditLog == null) {
+            auditLog = new JsonlAuditLog(Activator.getDefault().auditFile(), AUDIT_MAX_BYTES);
+        }
+        return auditLog;
     }
 
     private static ISecurePreferences secureNode() {
