@@ -64,7 +64,7 @@ public final class ChatSession {
                 }
                 runTools(turn.toolCalls(), toolContext, listener);
             }
-            listener.onNotice("Limite de " + settings.maxIterations() + " chamadas ao modelo atingido nesta pergunta.");
+            listener.onIterationLimit(settings.maxIterations());
         } catch (CancelledException e) {
             listener.onNotice("Cancelado.");
         } catch (LlmException e) {

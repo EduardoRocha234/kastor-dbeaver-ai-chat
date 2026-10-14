@@ -64,6 +64,7 @@ public class ChatView extends ViewPart {
 
     private static final Log log = Log.getLog(ChatView.class);
     private static final String EDITOR_CONNECTION = "(conexão do editor ativo)";
+    private static final int MAX_INPUT_CHARS = 50_000;
     private static final int MAX_TOOL_RESULT_CHARS = 4000;
 
     private final DBeaverGateway gateway = new DBeaverGateway();
@@ -302,6 +303,11 @@ public class ChatView extends ViewPart {
         }
         String text = typed.trim();
         if (text.isEmpty()) {
+            return;
+        }
+        if (text.length() > MAX_INPUT_CHARS) {
+            bridge.addError("Mensagem muito longa (" + text.length() + " caracteres). O limite é de "
+                    + MAX_INPUT_CHARS + ".");
             return;
         }
         ProviderConfig config = selectedProvider();
@@ -690,6 +696,14 @@ public class ChatView extends ViewPart {
             }
             String content = abbreviate(outcome.content());
             ui(() -> bridge.setToolResult(domId, content, outcome.error()));
+        }
+
+        @Override
+        public void onIterationLimit(int max) {
+            ui(() -> {
+                dropPendingBubble();
+                bridge.addLimitNotice("Limite de " + max + " chamadas ao modelo atingido nesta pergunta.");
+            });
         }
 
         @Override

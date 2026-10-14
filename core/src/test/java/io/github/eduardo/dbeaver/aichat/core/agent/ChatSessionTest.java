@@ -127,6 +127,11 @@ class ChatSessionTest {
     }
 
     @Test
+    void defaultIterationLimitIs50() {
+        assertEquals(50, SessionSettings.DEFAULT.maxIterations());
+    }
+
+    @Test
     void stopsAtIterationLimit() {
         Conversation conversation = Conversation.create();
         ScriptedProvider provider = new ScriptedProvider();

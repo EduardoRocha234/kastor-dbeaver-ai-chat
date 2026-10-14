@@ -19,6 +19,11 @@ public interface SessionListener {
 
     void onNotice(String message);
 
+    /** The per-question model call cap was hit; defaults to a plain notice. */
+    default void onIterationLimit(int max) {
+        onNotice("Limite de " + max + " chamadas ao modelo atingido nesta pergunta.");
+    }
+
     void onError(String message);
 
     void onTurnFinished();

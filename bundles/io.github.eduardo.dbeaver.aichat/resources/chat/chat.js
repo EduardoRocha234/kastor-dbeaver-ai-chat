@@ -136,6 +136,7 @@
   function autosize() {
     input.style.height = 'auto';
     input.style.height = Math.min(input.scrollHeight, 180) + 'px';
+    input.style.overflowY = input.scrollHeight > 180 ? 'auto' : 'hidden';
   }
 
   /** Send only makes sense with something typed. */
@@ -207,6 +208,14 @@
     }
   });
   input.addEventListener('input', function () { histIdx = -1; autosize(); updateSend(); updateMention(); });
+  input.addEventListener('paste', function () {
+    setTimeout(function () {
+      autosize(); updateSend();
+      if (input.value.length >= 50000) {
+        append(el('div', 'notice', 'Texto limitado a 50.000 caracteres.'));
+      }
+    }, 0);
+  });
   input.addEventListener('click', updateMention);
   input.addEventListener('keyup', function (e) {
     if (/^(ArrowLeft|ArrowRight|Home|End)$/.test(e.key)) { updateMention(); }
@@ -624,6 +633,20 @@
       if (box) { settle(box, label); }
     },
     addNotice: function (text) { append(el('div', 'notice', text)); },
+    addLimitNotice: function (text) {
+      var n = el('div', 'notice', text);
+      var more = el('div', 'more',
+        'Cada chamada ao modelo é um passo do agente (raciocinar, rodar uma query, analisar o resultado). ' +
+        'O limite evita laços infinitos e gasto excessivo de tokens. Aumente em Preferências > Kastor > Limites ' +
+        '(máximo 50) ou envie "continue" para o agente seguir de onde parou.');
+      more.hidden = true;
+      var actions = el('div', 'actions');
+      actions.appendChild(button('Editar limite', function () { aichatOpenSettings(''); }));
+      actions.appendChild(button('Saiba mais', function () { more.hidden = !more.hidden; }));
+      n.appendChild(actions);
+      n.appendChild(more);
+      append(n);
+    },
     addError: function (text) { append(el('div', 'error-msg', text)); },
 
     setProviders: function (entries, activeId) { setPicker(providerPicker, entries, activeId); },

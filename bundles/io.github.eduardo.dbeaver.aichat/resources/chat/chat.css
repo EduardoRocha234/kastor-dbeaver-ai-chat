@@ -154,6 +154,13 @@ details.tool pre { margin: 0 10px 8px; font-size: 11px; max-height: 260px; overf
 
 /* Notices and errors */
 .notice { text-align: center; color: var(--muted); font-size: 12px; margin: 10px 0; }
+.notice .actions { display: flex; justify-content: center; gap: 8px; margin-top: 6px; }
+.notice .actions button {
+  border: 1px solid var(--amber-line); background: var(--surface-2); color: var(--text); font-size: 11.5px;
+  padding: 3px 10px; border-radius: 8px; cursor: pointer;
+}
+.notice .actions button:hover { background: var(--amber-soft); }
+.notice .more { max-width: 460px; margin: 8px auto 0; text-align: left; line-height: 1.5; }
 .error-msg { margin: 8px 0 8px 34px; color: var(--danger); background: var(--danger-soft); border-radius: 10px; padding: 8px 12px; white-space: pre-wrap; }
 
 /* Composer */
@@ -190,7 +197,7 @@ details.tool pre { margin: 0 10px 8px; font-size: 11px; max-height: 260px; overf
 .pick-menu .opt .text { overflow: hidden; text-overflow: ellipsis; }
 .box:focus-within { border-color: var(--amber-line); box-shadow: 0 0 0 3px var(--amber-soft); }
 #input {
-  flex: 1; border: 0; outline: 0; resize: none; background: transparent; color: var(--text);
+  flex: none; width: 100%; box-sizing: border-box; overflow-y: auto; border: 0; outline: 0; resize: none; background: transparent; color: var(--text);
   font: inherit; line-height: 20px; max-height: 180px; padding: 2px 0; min-height: 24px;
 }
 #input::placeholder { color: var(--muted); }

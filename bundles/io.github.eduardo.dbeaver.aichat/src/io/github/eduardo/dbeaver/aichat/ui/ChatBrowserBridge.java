@@ -231,6 +231,10 @@ final class ChatBrowserBridge {
         call("addNotice", text);
     }
 
+    void addLimitNotice(String text) {
+        call("addLimitNotice", text);
+    }
+
     void addError(String text) {
         call("addError", text);
     }
