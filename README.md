@@ -1,28 +1,22 @@
 # Kastor - DBeaver AI Chat
 
-![Logo do Kastor](docs/brand/kastor-logo.png)
+<p align="center">
+  <img src="docs/brand/kastor-logo.png" alt="Logo do Kastor" width="420">
+</p>
 
 Chat de IA dentro do DBeaver (CE 24.1.0 ou mais novo) com acesso às conexões configuradas.
 Use o modelo que quiser: qualquer API compatível com OpenAI (OpenAI, Ollama, LM Studio, OpenRouter, Groq...) ou a API da Anthropic.
 
 ![Kastor acoplado à direita do DBeaver](docs/tutorial/kastor-chat.png)
 
-## O que o Kastor pode fazer
+## Get started
 
-- Listar conexões, schemas e tabelas; descrever tabelas (colunas, chaves, índices).
-- Rodar consultas de leitura (`SELECT`, `SHOW`, `EXPLAIN`) sozinha, com limite de linhas.
-- Comandos de escrita (`INSERT`, `UPDATE`, `DELETE`, DDL) **só depois da sua aprovação** no chat.
-  Conexões marcadas como somente leitura no DBeaver nunca recebem escrita.
-
-As consultas rodam num contexto de conexão separado do seu editor: leituras terminam em rollback e
-escritas aprovadas são confirmadas (commit) na hora.
-
-## Requisitos
+### Requisitos
 
 - DBeaver Community 24.1.0 ou mais novo (Windows, Linux ou macOS).
 - Uma chave de API de um provedor de IA, ou um modelo local (Ollama, LM Studio).
 
-## Instalação
+### Instalação
 
 Você precisa do arquivo `kastor-dbeaver-ai-chat-vX.X.X.zip` (o update site do plugin).
 **[Baixar o instalador mais recente](https://github.com/EduardoRocha234/kastor-dbeaver-ai-chat/releases/latest)** (em *Assets*). Para gerá-lo a partir do código, veja [Build](#build).
@@ -47,6 +41,16 @@ Não é preciso extrair o zip.
 **5.** Avance, aceite a licença e o aviso de conteúdo não assinado (**Install anyway**) e reinicie o DBeaver quando pedir.
 
 Para atualizar, repita os passos com o zip da nova versão. Para remover: **Ajuda → Installation Information → Installed Software**.
+
+## O que o Kastor pode fazer
+
+- Listar conexões, schemas e tabelas; descrever tabelas (colunas, chaves, índices).
+- Rodar consultas de leitura (`SELECT`, `SHOW`, `EXPLAIN`) sozinha, com limite de linhas.
+- Comandos de escrita (`INSERT`, `UPDATE`, `DELETE`, DDL) **só depois da sua aprovação** no chat.
+  Conexões marcadas como somente leitura no DBeaver nunca recebem escrita.
+
+As consultas rodam num contexto de conexão separado do seu editor: leituras terminam em rollback e
+escritas aprovadas são confirmadas (commit) na hora.
 
 ## Configuração
 
