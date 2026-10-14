@@ -54,9 +54,38 @@ escritas aprovadas são confirmadas (commit) na hora.
 
 ## Configuração
 
-1. **Window → Preferences → Kastor → Adicionar…**
-2. Escolha um modelo pronto (Anthropic, OpenAI, Ollama, LM Studio, OpenRouter) ou "Personalizado".
-3. Informe o modelo e a chave de API (guardada no Secure Storage do Eclipse) e clique **Testar**.
+Antes de conversar, cadastre ao menos um provedor de IA.
+
+**1.** No painel do Kastor, clique na engrenagem (canto superior direito). Isso abre **Preferences → Kastor**
+(ou use **Window → Preferences → Kastor**).
+
+![Engrenagem de configurações no painel do Kastor](docs/tutorial/config-1-engrenagem.png)
+
+**2.** Clique em **Adicionar…**.
+
+![Botão Adicionar na lista de provedores](docs/tutorial/config-2-adicionar.png)
+
+**3.** Escolha um **Modelo pronto** (Anthropic, OpenAI, Ollama, LM Studio, OpenRouter) ou **Personalizado**, confira
+o modelo e a URL base, cole a **Chave de API** (guardada no Secure Storage do Eclipse) e clique **OK**.
+
+![Diálogo Adicionar provedor de IA](docs/tutorial/config-3-provedor.png)
+
+| Campo | O que é |
+|-------|---------|
+| Tipo | `Anthropic` para a API da Anthropic; `OpenAI-compatible` para OpenAI, Ollama, LM Studio, OpenRouter, Groq, DeepSeek etc. |
+| URL base | Endereço da API (ex.: `https://api.anthropic.com`, `https://api.openai.com`, `http://localhost:11434`) |
+| Modelo | Nome do modelo no provedor (ex.: `claude-opus-5-5`) |
+| Chave de API | Obrigatória em provedores na nuvem; deixe vazia em Ollama/LM Studio locais |
+| Máx. tokens / Temperatura | Opcionais; vazio ou 0 usa o padrão do provedor |
+
+**4.** Selecione o provedor na lista, use **Testar** para validar e, se quiser, **Usar como padrão**.
+Clique **Apply** e depois **Apply and Close**.
+
+![Botões Apply e Apply and Close](docs/tutorial/config-4-aplicar.png)
+
+> **Assinatura Claude Pro/Max não funciona aqui.** O Kastor usa a **chave de API** da Anthropic
+> (console.anthropic.com), cobrada por token e separada da assinatura do Claude. Para custo menor ou zero,
+> use Ollama/LM Studio (local) ou provedores como OpenRouter e Groq.
 
 ## Uso
 
